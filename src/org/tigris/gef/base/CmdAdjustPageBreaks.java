@@ -21,9 +21,6 @@
 // CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT,
 // UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
-
-
-
 // File: CmdAdjustPageBreaks.java
 // Classes: CmdAdjustPageBreaks
 // Original Author: jrobbins@ics.uci.edu

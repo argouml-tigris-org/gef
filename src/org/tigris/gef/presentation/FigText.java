@@ -134,20 +134,31 @@ public class FigText extends Fig implements KeyListener, MouseListener {
    *  string, font, and font size. Text string is initially empty and
    *  centered. */
   public FigText(int x, int y, int w, int h,
-		 Color textColor, String familyName, int fontSize) {
+		 Color textColor, String familyName, int fontSize,
+		 boolean expandOnly) {
     super(x, y, w, h);
     _x = x; _y = y; _w = w; _h = h;
     _textColor = textColor;
     _font = new Font(familyName, Font.PLAIN, fontSize);
     _justification = JUSTIFY_CENTER;
     _curText = "";
+    _expandOnly = expandOnly;
+  }
+
+  public FigText(int x, int y, int w, int h,
+		 Color textColor, String familyName, int fontSize) {
+    this(x, y, w, h, textColor, familyName, fontSize, false);
+  }
+
+  /** Construct a new FigText with the given position and size */
+  public FigText(int x, int y, int w, int h ) {
+    this(x, y, w, h, Color.blue, "TimesRoman", 10, false);
   }
 
   /** Construct a new FigText with the given position, size, and attributes. */
-  public FigText(int x, int y, int w, int h ) {
-    this(x, y, w, h, Color.blue, "TimesRoman", 10);
+  public FigText(int x, int y, int w, int h , boolean expandOnly) {
+    this(x, y, w, h, Color.blue, "TimesRoman", 10, expandOnly);
   }
-
   ////////////////////////////////////////////////////////////////
   // invariant
 
@@ -328,7 +339,10 @@ public class FigText extends Fig implements KeyListener, MouseListener {
   public void append(String s) { setText(_curText + s); }
 
   /** set the current String to be the given String. */
-  public void setText(String s) { _curText = s; calcBounds(); }
+  public void setText(String s) {
+	  _curText = s;
+	  calcBounds();
+  }
 
   /** Get the String held by this FigText. Multi-line text is
    *  represented by newline characters embedded in the String. */
@@ -339,6 +353,7 @@ public class FigText extends Fig implements KeyListener, MouseListener {
 
   /** Paint the FigText. */
   public void paint(Graphics g) {
+    if (!(_displayed)) return;
     int chunkX = _x + _leftMargin;
     int chunkY = _y + _topMargin;
     StringTokenizer lines;
@@ -504,7 +519,7 @@ public class FigText extends Fig implements KeyListener, MouseListener {
   public void mouseEntered(MouseEvent me) { }
   
   public void mouseExited(MouseEvent me) { }
-  
+
   public FigTextEditor startTextEditor(InputEvent ie) {
     FigTextEditor te = new FigTextEditor(this, ie);
     return te;
@@ -519,6 +534,8 @@ public class FigText extends Fig implements KeyListener, MouseListener {
    *  now text objects can get larger when you type more, but they
    *  do not get smaller when you backspace.  */
   public void calcBounds() {
+    Rectangle bounds = getBounds();
+    //System.out.println("[FigText] calcBounds(1) "+getText()+": "+bounds.x+","+bounds.y+","+bounds.width+","+bounds.height);
     if (_font == null) return;
     if (_fm == null) _fm = Toolkit.getDefaultToolkit().getFontMetrics(_font);
     int overallW = 0;
@@ -536,21 +553,23 @@ public class FigText extends Fig implements KeyListener, MouseListener {
       _topMargin + _botMargin + maxDescent;
     overallW = Math.max(MIN_TEXT_WIDTH, overallW + _leftMargin + _rightMargin);
     switch (_justification) {
-      case JUSTIFY_LEFT: 
+      case JUSTIFY_LEFT:
         break;
-      
+
       case JUSTIFY_CENTER:
-        if (_w < overallW) 
+        if (_w < overallW)
           _x -= (overallW - _w) / 2;
         break;
-    
-      case JUSTIFY_RIGHT: 
-        if (_w < overallW) 
-          _x -= (overallW - _w); 
+
+      case JUSTIFY_RIGHT:
+        if (_w < overallW)
+          _x -= (overallW - _w);
         break;
     }
     _w = _expandOnly ? Math.max(_w, overallW) : overallW;
     _h = _expandOnly ? Math.max(_h, overallH) : overallH;
+    //System.out.println("[FigText] calcBounds(2): "+_x+","+_y+","+_w+","+_h);
   }
+
 } /* end class FigText */
 

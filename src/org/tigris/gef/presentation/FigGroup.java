@@ -23,10 +23,6 @@ package org.tigris.gef.presentation;
 // CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT,
 // UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
-
-
-
-
 // File: FigGroup.java
 // Classes: FigGroup
 // Original Author: jrobbins@ics.uci.edu
@@ -46,6 +42,10 @@ public class FigGroup extends Fig {
   //? use array for speed?
   protected Vector _figs;
 
+  /** The String of figs that are dynamically
+         generated. */
+  public String _dynObjects;
+
   ////////////////////////////////////////////////////////////////
   // constructors
 
@@ -53,23 +53,30 @@ public class FigGroup extends Fig {
   public FigGroup() {
 	super();
 	_figs = new Vector();
-  }  
+  }
   /** Construct a new FigGroup that holds the given Figs. */
   public FigGroup(Vector figs) {
 	super();
 	_figs = figs;
 	calcBounds();
-  }  
+  }
+
+  /** Empty method. Every figgroup that generates new
+         elements dynamically has to overwrite this method
+         for loading this figure. */
+  public void parseDynObjects(String dynStr) {
+  }
+
   /** Add a Fig to the group.  New Figs are added on the top. */
   public void addFig(Fig f) {
 	_figs.addElement(f);
 	f.setGroup(this);
 	calcBounds();
-  }  
+  }
   /** Accumulate a bounding box for all the Figs in the group. */
   public void calcBounds() {
 	Rectangle bbox; // could be blank final
-	Enumeration figs = _figs.elements();
+	Enumeration figs = getDisplayedFigs().elements();
 	if (figs.hasMoreElements()) bbox = ((Fig)figs.nextElement()).getBounds();
 	else bbox = new Rectangle(0, 0, 0, 0);
 	while (figs.hasMoreElements()) {
@@ -80,7 +87,7 @@ public class FigGroup extends Fig {
 	_y = bbox.y;
 	_w = bbox.width;
 	_h = bbox.height;
-  }  
+  }
    public Object clone() {
 	 FigGroup figClone = (FigGroup) super.clone();
 	 Vector figsClone = new Vector(_figs.size());
@@ -93,26 +100,26 @@ public class FigGroup extends Fig {
 	 }
 	 figClone._figs = figsClone;
 	 return figClone;
-   }   
+   }
   /** Returns true if any Fig in the group contains the given point. */
   public boolean contains(int x, int y) {
 	return hitFig(new Rectangle(x, y, 0, 0)) != null;
-  }  
+  }
   ////////////////////////////////////////////////////////////////
   // accessors
 
   /** Reply an Enumeration of the Figs contained in this FigGroup. */
-  public Enumeration elements() { return _figs.elements(); }  
+  public Enumeration elements() { return _figs.elements(); }
   /** Reply the Vector of Figs. */
-  public Vector getFigs() { return _figs; }  
+  public Vector getFigs() { return _figs; }
   public Color getFillColor() {
 	if (_figs.size() == 0) return super.getFillColor();
 	return ((Fig)_figs.elementAt(_figs.size()-1)).getFillColor();
-  }  
+  }
   public boolean getFilled() {
 	if (_figs.size() == 0) return super.getFilled();
 	return ((Fig)_figs.elementAt(_figs.size()-1)).getFilled();
-  }  
+  }
   public Font getFont() {
 	int size = _figs.size();
 	for (int i = 0; i < size; i++) {
@@ -120,7 +127,7 @@ public class FigGroup extends Fig {
 	  if (ft instanceof FigText) return ((FigText)ft).getFont();
 	}
 	return null;
-  }  
+  }
   public String getFontFamily() {
 	int size = _figs.size();
 	for (int i = 0; i < size; i++) {
@@ -128,7 +135,7 @@ public class FigGroup extends Fig {
 	  if (ft instanceof FigText) return ((FigText)ft).getFontFamily();
 	}
 	return "Serif";
-  }  
+  }
   public int getFontSize() {
 	int size = _figs.size();
 	for (int i = 0; i < size; i++) {
@@ -177,9 +184,10 @@ public String getPrivateData() {
 	  if (ft instanceof FigText) return ((FigText)ft).getTextFilled();
 	}
 	return false;
-  }  
+  }
+
   /** Returns true if any Fig in the group hits the given rect. */
-  public boolean hit(Rectangle r) { return hitFig(r) != null; }  
+  public boolean hit(Rectangle r) { return hitFig(r) != null; }
   ////////////////////////////////////////////////////////////////
   // Fig API
 
@@ -195,11 +203,11 @@ public String getPrivateData() {
 	  if (f.hit(r)) res = f;
 	}
 	return res;
-  }  
-  public boolean isReshapable() { return false; }  
+  }
+  public boolean isReshapable() { return false; }
   /** Groups are resizable, but not reshapable, and not rotatable (for now). */
-  public boolean isResizable() { return true; }  
-  public boolean isRotatable() { return false; }  
+  public boolean isResizable() { return true; }
+  public boolean isRotatable() { return false; }
   ////////////////////////////////////////////////////////////////
   // display methods
 
@@ -208,7 +216,7 @@ public String getPrivateData() {
 	Enumeration figs = elements();
 	while (figs.hasMoreElements()) {
 	  Fig f = (Fig) figs.nextElement();
-	  f.paint(g);
+	  if (f.isDisplayed()) f.paint(g);
 	}
   }  
   /** Delete all Fig's from the group. Fires PropertyChange with "bounds".*/
@@ -231,6 +239,27 @@ public String getPrivateData() {
 	calcBounds();
 	firePropChange("bounds", oldBounds, getBounds());
   }  
+
+  /** Returns a list of the displayable Figs enclosed. 
+   *  e.g. returns the list of enclosed Figs, without
+   *  the Compartments that should not be displayed. */
+  // added by Eric Lefevre 25 Mar 1999
+    // moved here by Toby 07 Nov 2000
+    public Vector getDisplayedFigs() {
+    Vector displayed = (Vector)getFigs().clone();
+    Fig f;
+
+    for (int i=0; i< _figs.size(); i++) {
+      f = (Fig)_figs.elementAt(i);
+      // removes the compartments that are not to be displayed
+      if ( !(f).isDisplayed() ) {
+        displayed.removeElement((Object)f);
+      }
+    }
+
+    return displayed;
+    }
+
   /** Set the bounding box to the given rect. Figs in the group are
    *  scaled to fit. Fires PropertyChange with "bounds" */
   public void setBounds(int x, int y, int w, int h) {
@@ -238,11 +267,13 @@ public String getPrivateData() {
 	Enumeration figs = _figs.elements();
 	while (figs.hasMoreElements()) {
 	  Fig f = (Fig) figs.nextElement();
-	  int newX = (_w == 0) ? x : x + ((f.getX() - _x) * w) / _w;
-	  int newY = (_h == 0) ? y : y + ((f.getY() - _y) * h) / _h;
-	  int newW = (_w == 0) ? 0 : (f.getWidth() * w) / _w;
-	  int newH = (_h == 0) ? 0 : (f.getHeight() * h) / _h;
-	  f.setBounds(newX, newY, newW, newH);
+	  if (f.isDisplayed()) {
+	      int newX = (_w == 0) ? x : x + ((f.getX() - _x) * w) / _w;
+	      int newY = (_h == 0) ? y : y + ((f.getY() - _y) * h) / _h;
+	      int newW = (_w == 0) ? 0 : f.getWidth() * (w / _w);
+	      int newH = (_h == 0) ? 0 : f.getHeight() * (h / _h);
+	      f.setBounds(newX, newY, newW, newH);
+	  }
 	}
 	calcBounds(); //_x = x; _y = y; _w = w; _h = h;
 	firePropChange("bounds", oldBounds, getBounds());
@@ -263,7 +294,7 @@ public String getPrivateData() {
 	int size = _figs.size();
 	for (int i = 0; i < size; i++)
 	  ((Fig)_figs.elementAt(i)).setFilled(f);
-  }  
+  }
   public void setFont(Font f) {
 	int size = _figs.size();
 	for (int i = 0; i < size; i++) {
@@ -321,21 +352,22 @@ public void setPrivateData(String data) {
 	  Object ft = _figs.elementAt(i);
 	  if (ft instanceof FigText) ((FigText)ft).setTextColor(c);
 	}
-  }  
+  }
   public void setTextFillColor(Color c) {
 	int size = _figs.size();
 	for (int i = 0; i < size; i++) {
 	  Object ft = _figs.elementAt(i);
 	  if (ft instanceof FigText) ((FigText)ft).setTextFillColor(c);
 	}
-  }  
+  }
   public void setTextFilled(boolean b) {
 	int size = _figs.size();
 	for (int i = 0; i < size; i++) {
 	  Object ft = _figs.elementAt(i);
 	  if (ft instanceof FigText) ((FigText)ft).setTextFilled(b);
 	}
-  }  
+  }
+
   /** Translate all the Fig in the list by the given offset. */
   public void translate(int dx, int dy) {
 	Rectangle oldBounds = getBounds();
@@ -346,5 +378,5 @@ public void setPrivateData(String data) {
 	}
 	_x += dx; _y += dy; // no need to call calcBounds();
 	firePropChange("bounds", oldBounds, getBounds());
-  }  
+  }
 } /* end class FigGroup */

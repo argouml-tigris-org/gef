@@ -112,6 +112,7 @@ public class Diagram implements java.io.Serializable, GraphListener {
     gm.addGraphEventListener(this);
   }
 
+  public GraphController getGraphController() { return getLayer().getGraphController(); }
   public LayerPerspective getLayer() { return _lay; }
   public void setLayer(LayerPerspective lay) { _lay = lay; }
 
@@ -140,8 +141,8 @@ public class Diagram implements java.io.Serializable, GraphListener {
     Vector figs = getLayer().getContents();
     int size = figs.size();
     for (int i = 0; i < size; i++)
-      if (figs.elementAt(i) instanceof FigNode)
-	res.addElement(((FigNode)figs.elementAt(i)).getOwner());
+		if (figs.elementAt(i) instanceof FigNode)
+			res.addElement(((FigNode)figs.elementAt(i)).getOwner());
     return res;
   }
 
@@ -152,8 +153,9 @@ public class Diagram implements java.io.Serializable, GraphListener {
     Vector figs = getLayer().getContents();
     int size = figs.size();
     for (int i = 0; i < size; i++)
-      if (figs.elementAt(i) instanceof FigEdge)
-	res.addElement(((FigEdge)figs.elementAt(i)).getOwner());
+		if ( (figs.elementAt(i) instanceof FigEdge) &&   // Some figs might not have a owner?
+			 (null != ((FigEdge)figs.elementAt(i)).getOwner()))
+			res.addElement(((FigEdge)figs.elementAt(i)).getOwner());
     return res;
   }
 

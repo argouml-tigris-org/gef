@@ -32,7 +32,7 @@ import javax.swing.border.*;
 import javax.swing.event.*;
 
 import org.tigris.gef.base.*;
-import org.tigris.gef.util.Util;
+import org.tigris.gef.util.*;
 
 public class ToolBar extends JToolBar implements MouseListener {
   protected Vector _lockable = new Vector();
@@ -54,29 +54,42 @@ public class ToolBar extends JToolBar implements MouseListener {
   }
 
   public JButton add(Action a, String name, String iconResourceStr) {
-    Icon icon = Util.loadIconResource(iconResourceStr, name);
+    Icon icon = ResourceLoader.lookupIconResource(iconResourceStr, name);
     //System.out.println(icon);
     return add(a, name, icon);
   }
 
   public JButton add(Action a, String name, Icon icon) {
-    JButton b = new JButton(icon);
-    if (a instanceof CmdSetMode || a instanceof CmdCreateNode)
-      _modeButtons.addElement(b);
-    b.setToolTipText(name + " ");
-    b.setEnabled(a.isEnabled());
-    b.addActionListener(a);
-    add(b);
-    if (a instanceof CmdSetMode || a instanceof CmdCreateNode)
-      _lockable.addElement(b);
-    PropertyChangeListener actionPropertyChangeListener =
-      createActionChangeListener(b);
-	if ( actionPropertyChangeListener != null ) {
-		a.addPropertyChangeListener(actionPropertyChangeListener);
-	}
-    b.addMouseListener(this);
-    // needs-more-work: should buttons appear stuck down while action executes?
-    return b;
+//     JButton b = new JButton(icon);
+//     if (a instanceof CmdSetMode || a instanceof CmdCreateNode)
+//       _modeButtons.addElement(b);
+//     b.setToolTipText(name + " ");
+//     b.setEnabled(a.isEnabled());
+//     b.addActionListener(a);
+//     add(b);
+//     if (a instanceof CmdSetMode || a instanceof CmdCreateNode)
+//       _lockable.addElement(b);
+//     PropertyChangeListener actionPropertyChangeListener =
+//       createActionChangeListener(b);
+// 	if ( actionPropertyChangeListener != null ) {
+// 		a.addPropertyChangeListener(actionPropertyChangeListener);
+// 	}
+//     b.addMouseListener(this);
+//     // needs-more-work: should buttons appear stuck down while action executes?
+//     return b;
+
+	  JButton b = super.add(a);
+	  b.setName(null);
+	  b.setText(null);
+	  b.setIcon(icon);
+	  b.setToolTipText(name + " ");
+	  if (a instanceof CmdSetMode || a instanceof CmdCreateNode)
+		  _modeButtons.addElement(b);
+	  if (a instanceof CmdSetMode || a instanceof CmdCreateNode)
+		  _lockable.addElement(b);
+	  b.addMouseListener(this);
+	  // needs-more-work: should buttons appear stuck down while action executes?
+	  return b;
   }
 
   public JToggleButton addToggle(Action a) {
@@ -86,7 +99,7 @@ public class ToolBar extends JToolBar implements MouseListener {
   }
 
   public JToggleButton addToggle(Action a, String name, String iconResourceStr) {
-    Icon icon = Util.loadIconResource(iconResourceStr, name);
+    Icon icon = ResourceLoader.lookupIconResource(iconResourceStr, name);
     //System.out.println(icon);
     return addToggle(a, name, icon);
   }
@@ -106,8 +119,8 @@ public class ToolBar extends JToolBar implements MouseListener {
 
   public JToggleButton addToggle(Action a, String name,
 				 String upRes, String downRes) {
-    ImageIcon upIcon = Util.loadIconResource(upRes, name);
-    ImageIcon downIcon = Util.loadIconResource(downRes, name);
+    ImageIcon upIcon = ResourceLoader.lookupIconResource(upRes, name);
+    ImageIcon downIcon = ResourceLoader.lookupIconResource(downRes, name);
     JToggleButton b = new JToggleButton(upIcon);
     b.setToolTipText(name + " ");
     b.setEnabled(a.isEnabled());

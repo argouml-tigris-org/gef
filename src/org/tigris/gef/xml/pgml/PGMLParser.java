@@ -28,16 +28,18 @@ import java.awt.*;
 import java.io.*;
 import java.net.URL;
 
-import com.ibm.xml.parser.*;
-import org.w3c.dom.*;
-
 import org.tigris.gef.base.*;
 import org.tigris.gef.presentation.*;
-import org.tigris.gef.graph.*;
 import org.tigris.gef.graph.presentation.*;
-import org.tigris.gef.xml.*;
+import org.tigris.gef.graph.*;
 
-public class PGMLParser implements ElementHandler, TagHandler {
+import org.tigris.gef.xml.*;
+import javax.xml.parsers.SAXParserFactory;
+import javax.xml.parsers.SAXParser;
+import org.xml.sax.*;
+
+
+public class PGMLParser extends HandlerBase {
 
   ////////////////////////////////////////////////////////////////
   // static variables
@@ -49,33 +51,71 @@ public class PGMLParser implements ElementHandler, TagHandler {
 
   protected Diagram   _diagram = null;
   protected int       _nestedGroups = 0;
-  protected Hashtable _figRegistry = null;
-  protected Hashtable _ownerRegistry = new Hashtable();
+  protected HashMap _figRegistry = null;
+  protected Map _ownerRegistry = new HashMap();
 
   ////////////////////////////////////////////////////////////////
   // constructors
 
-  protected PGMLParser() { }
+  protected PGMLParser() {
+  }
 
   ////////////////////////////////////////////////////////////////
   // main parsing methods
 
   public synchronized Diagram readDiagram(URL url) {
+      try {
+	  return readDiagram(url.openStream());
+      } catch (IOException e) {
+	  System.out.println("Couldn't open InputStream! "+e);
+	  e.printStackTrace();
+      }
+      return null;
+  }
+
+  public synchronized Diagram readDiagram(InputStream is) {
+      return readDiagram(is, true);
+  }
+
+  public synchronized Diagram readDiagram(InputStream is, boolean closeStream) {
     try {
-      InputStream is = url.openStream();
-      String filename = url.getFile();
       System.out.println("=======================================");
-      System.out.println("== READING DIAGRAM: " + url);
-      Parser pc = new Parser(filename);
-      pc.addElementHandler(this);
-      pc.setTagHandler(this);
-      pc.getEntityHandler().setEntityResolver(DTDEntityResolver.SINGLETON);
-      //pc.setProcessExternalDTD(false);
+      System.out.println("== READING DIAGRAM");
+      SAXParserFactory factory = SAXParserFactory.newInstance();
+      factory.setNamespaceAware(false);
+      factory.setValidating(false);
       initDiagram("org.tigris.gef.base.Diagram");
-      _figRegistry = new Hashtable();
-      pc.readStream(is);
-      is.close();
+      _figRegistry = new HashMap();
+      SAXParser pc = factory.newSAXParser();
+      InputSource source = new InputSource(is);
+
+      // what is this for?
+      // source.setSystemId(url.toString());
+      pc.parse(source,this);
+      // source = null;
+      if (closeStream) {
+	  System.out.println("closing stream now (in PGMLParser.readDiagram)");	  
+	  is.close();
+      }
+      else {
+	  System.out.println("leaving stream OPEN!");
+      }
       return _diagram;
+    }
+    catch(SAXException saxEx) {
+      System.out.println("Exception in readDiagram");
+        //
+        //  a SAX exception could have been generated
+        //    because of another exception.
+        //    Get the initial exception to display the
+        //    location of the true error
+      Exception ex = saxEx.getException();
+      if(ex == null) {
+        saxEx.printStackTrace();
+      }
+      else {
+        ex.printStackTrace();
+      }
     }
     catch (Exception ex) {
       System.out.println("Exception in readDiagram");
@@ -87,7 +127,7 @@ public class PGMLParser implements ElementHandler, TagHandler {
   ////////////////////////////////////////////////////////////////
   // accessors
 
-  public void setOwnerRegistry(Hashtable owners) {
+  public void setOwnerRegistry(Map owners) {
     _ownerRegistry = owners;
   }
 
@@ -95,123 +135,317 @@ public class PGMLParser implements ElementHandler, TagHandler {
   // internal methods
 
   protected void initDiagram(String diagDescr) {
-    String clsName = diagDescr;
-    String initStr = null;
-    int bar = diagDescr.indexOf("|");
-    if (bar != -1) {
-      clsName = diagDescr.substring(0, bar);
-      initStr = diagDescr.substring(bar + 1);
-    }
-    try {
-		System.out.println( "PGMLParser.initDiagram: clsName = " + clsName );
-		System.out.println( "PGMLParser.initDiagram: initStr = " + initStr );
-      Class cls = Class.forName(clsName);
-      _diagram = (Diagram) cls.newInstance();
-      if (initStr != null && !initStr.equals(""))
-	_diagram.initialize(findOwner(initStr));
-    }
-    catch (Exception ex) {
-      System.out.println("could not set diagram type to " + clsName);
-      ex.printStackTrace();
-    }
+      String clsName = diagDescr;
+      String initStr = null;
+      int bar = diagDescr.indexOf("|");
+      if (bar != -1) {
+	  clsName = diagDescr.substring(0, bar);
+	  initStr = diagDescr.substring(bar + 1);
+      }
+
+      String newClassName = translateClassName(clsName);
+      try {
+	  Class cls = Class.forName(newClassName);
+	  _diagram = (Diagram) cls.newInstance();
+
+	  if (initStr != null && !initStr.equals(""))
+	      _diagram.initialize(findOwner(initStr));
+      }
+      catch (Exception ex) {
+	  System.out.println("could not set diagram type to " + newClassName);
+	  ex.printStackTrace();
+      }
   }
 
 
   ////////////////////////////////////////////////////////////////
   // XML element handlers
+  private int _elementState = 0;
+  private static final int DEFAULT_STATE = 0;
+  private static final int TEXT_STATE = 1;
+  private static final int LINE_STATE = 2;
+  private static final int POLY_STATE = 3;
+  private static final int NODE_STATE = 4;
+  private static final int EDGE_STATE = 5;
+  private static final int PRIVATE_STATE = 6;
+  private static final int ANNOTATION_STATE = 7;
 
-  public void handleStartTag(TXElement e, boolean empty) {
-    String elementName = e.getName();
-    if ("group".equals(elementName)) _nestedGroups++;
-    else if (elementName.equals("pgml")) handlePGML(e);
-  }
+  private static final int PRIVATE_NODE_STATE = 46;
+  private static final int PRIVATE_EDGE_STATE = 56;
+  private static final int ANNOTATION_EDGE_STATE = 57;
+  private static final int TEXT_NODE_STATE = 41;
+  private static final int TEXT_EDGE_STATE = 51;
+  private static final int TEXT_ANNOTATION_STATE = 71;
+  private static final int POLY_EDGE_STATE = 53;
+  private static final int DEFAULT_NODE_STATE = 40;
+  private static final int DEFAULT_EDGE_STATE = 50;
 
-  public void handleEndTag(TXElement e, boolean empty) {
-    String elementName = e.getName();
-    if ("group".equals(elementName)) _nestedGroups--;
-  }
+  public void startElement(String elementName,AttributeList attrList) {
+    switch(_elementState) {
+        case DEFAULT_STATE:
+        if ("group".equals(elementName)) {
+            _nestedGroups++;
+            _diagram.add(handleGroup(attrList));
+        }
+        else if (elementName.equals("pgml")) {
+            handlePGML(attrList);
+        }
 
-  public TXElement handleElement(TXElement e) {
-    try {
-      String elementName = e.getName();
-      if (elementName.equals("pgml")) { /* do nothing */ }
-      else if (elementName.equals("group"))
-	_diagram.add(handleGroup(e));
-      else if (_nestedGroups == 0) {
-	if (elementName.equals("path"))
-	  _diagram.add(handlePolyLine(e));
-	else if (elementName.equals("ellipse"))
-	  _diagram.add(handleEllipse(e));
-	else if (elementName.equals("rectangle"))
-	  _diagram.add(handleRect(e));
-	else if (elementName.equals("text"))
-	  _diagram.add(handleText(e));
-	else if (elementName.equals("piewedge")) { }
-	else if (elementName.equals("circle")) { }
-	else if (elementName.equals("moveto")) { }
-	else if (elementName.equals("lineto")) { }
-	else if (elementName.equals("curveto")) { }
-	else if (elementName.equals("arc")) { }
-	else if (elementName.equals("closepath")) { }
-	else System.out.println("unknown top-level tag: " + elementName);
-      }
-      else if (_nestedGroups > 0) {
-	//System.out.println("skipping nested " + elementName);
-      }
+        else if (_nestedGroups == 0) {
+            if (elementName.equals("path")) {
+	        _diagram.add(handlePolyLine(attrList));
+	    }
+	    else if (elementName.equals("ellipse")) {
+	        _diagram.add(handleEllipse(attrList));
+	    }
+	    else if (elementName.equals("rectangle")) {
+	        _diagram.add(handleRect(attrList));
+	    }
+	    else if (elementName.equals("text")) {
+			_elementState = TEXT_STATE;
+			_textBuf = new StringBuffer();
+	        _diagram.add(handleText(attrList));
+	    }
+	    else if (elementName.equals("piewedge")) { }
+	    else if (elementName.equals("circle")) { }
+	    else if (elementName.equals("moveto")) { }
+	    else if (elementName.equals("lineto")) { }
+	    else if (elementName.equals("curveto")) { }
+	    else if (elementName.equals("arc")) { }
+	    else if (elementName.equals("closepath")) { }
+	    else System.out.println("unknown top-level tag: " + elementName);
+        }
+        else if (_nestedGroups > 0) {
+			//System.out.println("skipping nested " + elementName);
+        }
+        break;
+
+        case LINE_STATE:
+        lineStateStartElement(elementName,attrList);
+        break;
+
+        case POLY_STATE:
+        polyStateStartElement(elementName,attrList);
+        break;
+
+        case POLY_EDGE_STATE:
+        polyStateStartElement(elementName,attrList);
+        break;
+
+        case NODE_STATE:
+			nodeStateStartElement(elementName,attrList);
+			break;
+
+        case EDGE_STATE:
+        edgeStateStartElement(elementName,attrList);
+        break;
+
+        case ANNOTATION_STATE:
+	    annotationStateStartElement(elementName,attrList);
+	    break;
     }
-    catch (Exception ex) {
-      System.out.println("Exception in PGMLParser handleElement");
-      ex.printStackTrace();
-    }
-    return e; // needs-more-work: too much memory? should return null.
   }
 
+  public void endElement(String elementName) {
+    switch(_elementState) {
+        case 0:
+        if ("group".equals(elementName)) {
+            _nestedGroups--;
+        }
+        break;
 
-  protected void handlePGML(TXElement e) {
-    String name = e.getAttribute("name");
-    String clsName = e.getAttribute("description");
+        case POLY_STATE:
+        if(elementName.equals("path")) {
+            _elementState = DEFAULT_STATE;
+            _currentPoly = null;
+        }
+        break;
+
+        case LINE_STATE:
+        if(elementName.equals("line")) {
+            _elementState = DEFAULT_STATE;
+            _currentLine = null;
+        }
+        break;
+
+        case TEXT_STATE:
+			//System.out.println("[PGMLParser]: endElement TEXT_STATE: " + elementName);
+			if(elementName.equals("text")) {
+				_currentText.setText(_textBuf.toString());
+				_elementState = DEFAULT_STATE;
+				_currentText = null;
+				_textBuf = null;
+			}
+			break;
+
+        case TEXT_NODE_STATE:
+			//System.out.println("[PGMLParser]: endElement TEXT_NODE_STATE: " + _textBuf.toString());
+			if(elementName.equals("text")) {
+				_currentText.setText(_textBuf.toString());
+				_elementState = NODE_STATE;
+				_currentText = null;
+				_textBuf = null;
+			}
+			break;
+
+        case TEXT_EDGE_STATE:
+			//System.out.println("[PGMLParser]: endElement TEXT_EDGE_STATE: " + _textBuf.toString());
+			if(elementName.equals("text")) {
+				_currentText.setText(_textBuf.toString());
+				_elementState = EDGE_STATE;
+				_currentText = null;
+				_textBuf = null;
+			}
+			break;
+
+        case TEXT_ANNOTATION_STATE:
+	    //System.out.println("[PGMLParser]: endElement TEXT_ANNOTATION_STATE: " + _textBuf.toString());
+	    if(elementName.equals("text")) {
+		_currentText.setText(_textBuf.toString());
+		_currentEdge.addAnnotation(_currentText,"text",_currentText.getContext());
+		_elementState = ANNOTATION_STATE;
+		_currentText = null;
+		_textBuf = null;
+	    }
+	    break;
+
+        case POLY_EDGE_STATE:
+	    if(elementName.equals("path")) {
+		_elementState = EDGE_STATE;
+		_currentPoly = null;
+	    }
+	    break;
+
+        case NODE_STATE:
+			//System.out.println("[PGMLParser]: endElement NODE_STATE");
+            _elementState = DEFAULT_STATE;
+            _currentNode = null;
+            _textBuf = null;
+        break;
+
+        case EDGE_STATE:
+	    //System.out.println("[PGMLParser]: endElement EDGE_STATE");
+            _elementState = DEFAULT_STATE;
+	    _currentEdge.updateAnnotationPositions();
+            _currentEdge = null;
+	    _currentPoly = null;
+            _textBuf = null;
+	    break;
+
+        case ANNOTATION_STATE:
+	    //System.out.println("[PGMLParser]: endElement ANNOTATION_STATE");
+            _elementState = EDGE_STATE;
+	    break;
+
+        case PRIVATE_STATE:
+			//System.out.println("[PGMLParser]: endElement PRIVATE_STATE");
+            privateStateEndElement(elementName);
+            _textBuf = null;
+            _elementState = DEFAULT_STATE;
+			break;
+
+        case PRIVATE_NODE_STATE:
+			//System.out.println("[PGMLParser]: endElement PRIVATE_NODE_STATE");
+            privateStateEndElement(elementName);
+            _textBuf = null;
+            _elementState = NODE_STATE;
+			break;
+
+        case PRIVATE_EDGE_STATE:
+			//System.out.println("[PGMLParser]: endElement PRIVATE_EDGE_STATE");
+            privateStateEndElement(elementName);
+            _textBuf = null;
+            _elementState = EDGE_STATE;
+			break;
+
+        case DEFAULT_NODE_STATE:
+			//System.out.println("[PGMLParser]: endElement DEFAULT_NODE_STATE");
+            _elementState = NODE_STATE;
+            _textBuf = null;
+        break;
+
+        case DEFAULT_EDGE_STATE:
+			//System.out.println("[PGMLParser]: endElement DEFAULT_EDGE_STATE");
+            _elementState = EDGE_STATE;
+            _textBuf = null;
+        break;
+    }
+  }
+
+  public void characters(char[] ch,
+                       int start,
+                       int length) {
+    if((_elementState == TEXT_STATE || _elementState == PRIVATE_STATE ||
+		_elementState == TEXT_NODE_STATE || _elementState == TEXT_EDGE_STATE ||
+		_elementState == PRIVATE_NODE_STATE || _elementState == PRIVATE_EDGE_STATE) &&
+        _textBuf != null) {
+        _textBuf.append(ch,start,length);
+    }
+  }
+
+  protected void handlePGML(AttributeList attrList) {
+    String name = attrList.getValue("name");
+    String clsName = attrList.getValue("description");
     try {
       if (clsName != null && !clsName.equals("")) initDiagram(clsName);
       if (name != null && !name.equals("")) _diagram.setName(name);
     }
-    catch (Exception ex) { System.out.println("Exception in handlePGML"); }
-  }
-
-  protected Fig handlePolyLine(TXElement e) {
-    String clsName = e.getAttribute("description");
-    if (clsName != null && clsName.indexOf("FigLine") != -1)
-      return handleLine(e);
-    else
-      return handlePath(e);
-  }
-
-  protected FigLine handleLine(TXElement e) {
-    FigLine f = new FigLine(0, 0, 100, 100);
-    setAttrs(f, e);
-    TXElement moveto = e.getElementNamed("moveto");
-    TXElement lineto = e.getElementNamed("lineto");
-    if (moveto != null && lineto != null) {
-      String x1 = moveto.getAttribute("x");
-      String y1 = moveto.getAttribute("y");
-      String x2 = lineto.getAttribute("x");
-      String y2 = lineto.getAttribute("y");
-      int x1Int = (x1 == null || x1.equals("")) ? 0 : Integer.parseInt(x1);
-      int y1Int = (y1 == null || y1.equals("")) ? 0 : Integer.parseInt(y1);
-      int x2Int = (x2 == null || x2.equals("")) ? x1Int : Integer.parseInt(x2);
-      int y2Int = (y2 == null || y2.equals("")) ? y1Int : Integer.parseInt(y2);
-      f.setX1(x1Int);
-      f.setY1(y1Int);
-      f.setX2(x2Int);
-      f.setY2(y2Int);
+    catch (Exception ex) {
+        System.out.println("Exception in handlePGML");
     }
-    return f;
   }
 
-  protected FigCircle handleEllipse(TXElement e) {
+  protected Fig handlePolyLine(AttributeList attrList) {
+    String clsName = translateClassName(attrList.getValue("description"));
+    if (clsName != null && clsName.indexOf("FigLine") != -1) {
+      return handleLine(attrList);
+    }
+    else {
+      return handlePath(attrList);
+    }
+  }
+
+  private FigLine _currentLine = null;
+  private int _x1Int = 0;
+  private int _y1Int = 0;
+  protected FigLine handleLine(AttributeList attrList) {
+    _currentLine = new FigLine(0, 0, 100, 100);
+    setAttrs(_currentLine, attrList);
+    _x1Int = 0;
+    _y1Int = 0;
+    _elementState = LINE_STATE;
+    return _currentLine;
+  }
+
+  protected void lineStateStartElement(String tagName,AttributeList attrList) {
+      if(_currentLine != null) {
+          if(tagName.equals("moveto")) {
+              String x1 = attrList.getValue("x");
+              String y1 = attrList.getValue("y");
+              _x1Int = (x1 == null || x1.equals("")) ? 0 : Integer.parseInt(x1);
+              _y1Int = (y1 == null || y1.equals("")) ? 0 : Integer.parseInt(y1);
+              _currentLine.setX1(_x1Int);
+              _currentLine.setY1(_y1Int);
+              //System.out.println("[PGMLParser] lineStateStartElement: x1="+x1+" y1="+y1);
+          }
+          else if(tagName.equals("lineto")) {
+            String x2 = attrList.getValue("x");
+            String y2 = attrList.getValue("y");
+            int x2Int = (x2 == null || x2.equals("")) ? _x1Int : Integer.parseInt(x2);
+            int y2Int = (y2 == null || y2.equals("")) ? _y1Int : Integer.parseInt(y2);
+            _currentLine.setX2(x2Int);
+            _currentLine.setY2(y2Int);
+              //System.out.println("[PGMLParser] lineStateStartElement: x2="+x2+" y2="+y2);
+          }
+      }
+  }
+
+
+  protected FigCircle handleEllipse(AttributeList attrList) {
     FigCircle f = new FigCircle(0, 0, 50, 50);
-    setAttrs(f, e);
-    String rx = e.getAttribute("rx");
-    String ry = e.getAttribute("ry");
+    setAttrs(f, attrList);
+    String rx = attrList.getValue("rx");
+    String ry = attrList.getValue("ry");
     int rxInt = (rx == null || rx.equals("")) ? 10 : Integer.parseInt(rx);
     int ryInt = (ry == null || ry.equals("")) ? 10 : Integer.parseInt(ry);
     f.setX(f.getX() - rxInt);
@@ -221,9 +455,9 @@ public class PGMLParser implements ElementHandler, TagHandler {
     return f;
   }
 
-  protected FigRect handleRect(TXElement e) {
+  protected FigRect handleRect(AttributeList attrList) {
     FigRect f;
-    String cornerRadius = e.getAttribute("rounding");
+    String cornerRadius = attrList.getValue("rounding");
     if (cornerRadius == null || cornerRadius.equals("")) {
       f = new FigRect(0, 0, 80, 80);
     }
@@ -232,55 +466,78 @@ public class PGMLParser implements ElementHandler, TagHandler {
       int rInt = Integer.parseInt(cornerRadius);
       ((FigRRect)f).setCornerRadius(rInt);
     }
-    setAttrs(f, e);
+    setAttrs(f, attrList);
     return f;
   }
 
-  protected FigText handleText(TXElement e) {
-    FigText f = new FigText(100, 100, 90, 45);
-    setAttrs(f, e);
-    String text = e.getText();
-    f.setText(text);
-    String font = e.getAttribute("font");
-    if (font != null && !font.equals("")) f.setFontFamily(font);
-    String textsize = e.getAttribute("textsize");
-    if (textsize != null && !textsize.equals("")) {
-      int textsizeInt = Integer.parseInt(textsize);
-      f.setFontSize(textsizeInt);
-    }
-    return f;
-  }
-
-  protected FigPoly handlePath(TXElement e) {
-    FigPoly f = new FigPoly();
-    setAttrs(f, e);
-    if (e.hasChildNodes()) {
-      NodeList nl = e.getChildNodes();
-      int size = nl.getLength();
-      for (int i = 0; i < size; i++) {
-	Node n = nl.item(i);
-	int xInt = 0;
-	int yInt = 0;
-	if (n instanceof TXElement) {
-	  String x = ((TXElement)n).getAttribute("x");
-	  if (x != null && !x.equals("")) xInt = Integer.parseInt(x);
-	  String y = ((TXElement)n).getAttribute("y");
-	  if (y != null && !y.equals("")) yInt = Integer.parseInt(y);
-	  //needs-more-work: dx, dy
-	  f.addPoint(xInt, yInt);
-	}
+  private FigText _currentText = null;
+  private StringBuffer _textBuf = null;
+  protected FigText handleText(AttributeList attrList) {
+      //System.out.println("[PGMLParser]: handleText");
+      FigText f = new FigText(100, 100, 90, 45);
+      setAttrs(f, attrList);
+      _currentText = f;
+      //_elementState = TEXT_STATE;
+      //_textBuf = new StringBuffer();
+      //String text = e.getText();
+      //f.setText(text);
+      String font = attrList.getValue("font");
+      if (font != null && !font.equals("")) f.setFontFamily(font);
+      String textsize = attrList.getValue("textsize");
+      if (textsize != null && !textsize.equals("")) {
+	  int textsizeInt = Integer.parseInt(textsize);
+	  f.setFontSize(textsizeInt);
       }
-    }
+      
+      return f;
+  }
+
+  private FigPoly _currentPoly = null;
+  protected FigPoly handlePath(AttributeList attrList) {
+    FigPoly f = new FigPoly();
+    setAttrs(f, attrList);
+    _currentPoly = f;
+    _elementState = POLY_STATE;
     return f;
   }
 
+
+  private void polyStateStartElement(String tagName,AttributeList attrList) {
+      if(_currentPoly != null) {
+          if(tagName.equals("moveto")) {
+              String x1 = attrList.getValue("x");
+              String y1 = attrList.getValue("y");
+              _x1Int = (x1 == null || x1.equals("")) ? 0 : Integer.parseInt(x1);
+              _y1Int = (y1 == null || y1.equals("")) ? 0 : Integer.parseInt(y1);
+              //_currentLine.setX1(_x1Int);
+              //_currentLine.setY1(_y1Int);
+			  _currentPoly.addPoint(_x1Int,_y1Int);
+              //System.out.println("[PGMLParser] polyStateStartElement: x1="+x1+" y1="+y1);
+          }
+          else if(tagName.equals("lineto")) {
+            String x2 = attrList.getValue("x");
+            String y2 = attrList.getValue("y");
+            int x2Int = (x2 == null || x2.equals("")) ? _x1Int : Integer.parseInt(x2);
+            int y2Int = (y2 == null || y2.equals("")) ? _y1Int : Integer.parseInt(y2);
+            //_currentLine.setX2(x2Int);
+            //_currentLine.setY2(y2Int);
+			_currentPoly.addPoint(x2Int,y2Int);
+              //System.out.println("[PGMLParser] polyStateStartElement: x2="+x2+" y2="+y2);
+          }
+      }
+      //System.out.println("[PGMLParser] polyStateStartElement: numPoints"+_currentPoly.getNumPoints());
+  }
+
+  private FigNode _currentNode = null;
   /* Returns Fig rather than FigGroups because this is also
      used for FigEdges. */
-  protected Fig handleGroup(TXElement e) {
+  protected Fig handleGroup(AttributeList attrList) {
+    //System.out.println("[PGMLParser]: handleGroup: ");
     Fig f = null;
-    String clsNameBounds = e.getAttribute("description");
+    String clsNameBounds = attrList.getValue("description");
     StringTokenizer st = new StringTokenizer(clsNameBounds, ",;[] ");
-    String clsName = st.nextToken();
+    String clsName = translateClassName(st.nextToken());
+    //System.out.println("[PGMLParser]: handleGroup: " + clsName);
     String xStr = null, yStr = null, wStr = null, hStr = null;
     if (st.hasMoreElements()) {
       xStr = st.nextToken();
@@ -289,7 +546,7 @@ public class PGMLParser implements ElementHandler, TagHandler {
       hStr = st.nextToken();
     }
     try {
-      Class nodeClass = Class.forName(clsName);
+      Class nodeClass = Class.forName(translateClassName(clsName));
       f = (Fig) nodeClass.newInstance();
       if (xStr != null && !xStr.equals("")) {
 	int x = Integer.parseInt(xStr);
@@ -299,72 +556,14 @@ public class PGMLParser implements ElementHandler, TagHandler {
 	f.setBounds(x, y, w, h);
       }
       if (f instanceof FigNode) {
-	FigNode fn = (FigNode) f;
-	if (e.hasChildNodes()) {
-	  NodeList nl = e.getChildNodes();
-	  int size = nl.getLength();
-	  for (int i = 0; i < size; i++) {
-	    Node n = nl.item(i);
-	    if (n instanceof TXElement) {
-	      TXElement pe = (TXElement) n;
-	      String peName = pe.getName();
-	      if ("private".equals(peName)) {
-		Fig encloser = null;
-		String body = pe.getText();
-		StringTokenizer st2 = new StringTokenizer(body, "=\"' \t\n");
-		while (st2.hasMoreElements()) {
-		  String t = st2.nextToken();
-		  String v = "no such fig";
-		  if (st2.hasMoreElements()) v = st2.nextToken();
-		  if (t.equals("enclosingFig")) encloser = findFig(v);
-		}
-		fn.setEnclosingFig(encloser);
-	      }
-	    }
-	  }
-	}
+		  FigNode fn = (FigNode) f;
+		  _currentNode = fn;
+		  _elementState = NODE_STATE;
+		  _textBuf = new StringBuffer();
       }
       if (f instanceof FigEdge) {
-	FigEdge fe = (FigEdge) f;
-	if (e.hasChildNodes()) {
-	  NodeList nl = e.getChildNodes();
-	  int size = nl.getLength();
-	  for (int i = 0; i < size; i++) {
-	    Node n = nl.item(i);
-	    if (n instanceof TXElement) {
-	      TXElement pe = (TXElement) n;
-	      String peName = pe.getName();
-	      if ("path".equals(peName)) {
-		Fig p = handlePath(pe);
-		fe.setFig(p);
-		((FigPoly)p)._isComplete = true;
-		fe.calcBounds();
-		if (fe instanceof FigEdgePoly)
-		  ((FigEdgePoly)fe).setInitiallyLaidOut(true);
-	      }
-	      else if ("private".equals(peName)) {
-		Fig spf = null;
-		Fig dpf = null;
-		FigNode sfn = null;
-		FigNode dfn = null;
-		String body = pe.getText();
-		StringTokenizer st2 = new StringTokenizer(body, "=\"' \t\n");
-		while (st2.hasMoreElements()) {
-		  String t = st2.nextToken();
-		  String v = st2.nextToken();
-		  if (t.equals("sourcePortFig")) spf = findFig(v);
-		  if (t.equals("destPortFig")) dpf = findFig(v);
-		  if (t.equals("sourceFigNode")) sfn = (FigNode) findFig(v);
-		  if (t.equals("destFigNode")) dfn = (FigNode) findFig(v);
-		}
-		fe.setSourcePortFig(spf);
-		fe.setDestPortFig(dpf);
-		fe.setSourceFigNode(sfn);
-		fe.setDestFigNode(dfn);
-	      }
-	    }
-	  }
-	}
+		  _currentEdge = (FigEdge) f;
+		  _elementState = EDGE_STATE;
       }
     }
     catch (Exception ex) {
@@ -375,50 +574,176 @@ public class PGMLParser implements ElementHandler, TagHandler {
       System.out.println("No constructor() in class " + clsName);
       ex.printStackTrace();
     }
-    setAttrs(f, e);
+    setAttrs(f, attrList);
     return f;
   }
+
+    private void privateStateEndElement(String tagName) {
+        if(_currentNode != null) {
+			if ( _currentEdge != null ) _currentEdge = null;
+
+            String body = _textBuf.toString();
+            StringTokenizer st2 = new StringTokenizer(body, "=\"' \t\n");
+            Fig encloser = null;
+            while (st2.hasMoreElements()) {
+                String t = st2.nextToken();
+                String v = "no such fig";
+                if (st2.hasMoreElements()) v = st2.nextToken();
+                if (t.equals("enclosingFig")) encloser = findFig(v);
+            }
+            _currentNode.setEnclosingFig(encloser);
+        }
+        if(_currentEdge != null) {
+            Fig spf = null;
+            Fig dpf = null;
+            FigNode sfn = null;
+            FigNode dfn = null;
+            String body = _textBuf.toString();
+            StringTokenizer st2 = new StringTokenizer(body, "=\"' \t\n");
+            while (st2.hasMoreElements()) {
+                String t = st2.nextToken();
+                String v = st2.nextToken();
+                if (t.equals("sourcePortFig")) spf = findFig(v);
+                if (t.equals("destPortFig")) dpf = findFig(v);
+                if (t.equals("sourceFigNode")) sfn = (FigNode) findFig(v);
+                if (t.equals("destFigNode")) dfn = (FigNode) findFig(v);
+            }
+            _currentEdge.setSourcePortFig(spf);
+            _currentEdge.setDestPortFig(dpf);
+            _currentEdge.setSourceFigNode(sfn);
+            _currentEdge.setDestFigNode(dfn);
+        }
+    }
+
+	private void nodeStateStartElement(String tagName,AttributeList attrList) {
+		//System.out.println("[PGMLParser]: nodeStateStartElement: " + tagName);
+		if (tagName.equals("private")) {
+			_textBuf = new StringBuffer();
+			_elementState = PRIVATE_NODE_STATE;
+		}
+		else if (tagName.equals("text")) {
+			_textBuf = new StringBuffer();
+			_elementState = TEXT_NODE_STATE;
+			Fig p = handleText(attrList);
+			//needs-more-work: FigText should be set at distinct position within surrounding
+			// Fig, but this is not supported by Fig framework yet!
+			//_currentNode.addFig(handleText(attrList));
+        }
+		else {
+			_textBuf = new StringBuffer();
+			_elementState = DEFAULT_NODE_STATE;
+		}
+  }
+
+    private FigEdge _currentEdge = null;
+    private void edgeStateStartElement(String tagName,AttributeList attrList)
+    {
+	//System.out.println("[PGMLParser]: edgeStateStartElement: " + tagName + " " + _elementState);
+        if (tagName.equals("path")) {
+            Fig p = handlePath(attrList);
+	    _elementState = POLY_EDGE_STATE;
+            _currentEdge.setFig(p);
+            ((FigPoly)p)._isComplete = true;
+            _currentEdge.calcBounds();
+	    //System.out.println("[PGMLParser]: edgeStateStartElement: cur= " + _currentEdge.getNumPoints());
+            if (_currentEdge instanceof FigEdgePoly) {
+                ((FigEdgePoly)_currentEdge).setInitiallyLaidOut(true);
+            }
+	    _currentEdge.updateAnnotationPositions();
+        }
+        else if (tagName.equals("private")) {
+            _elementState = PRIVATE_EDGE_STATE;
+            _textBuf = new StringBuffer();
+        }
+        else if (tagName.equals("annotations") || tagName.equals("anotations")) {
+            _elementState = ANNOTATION_STATE;
+            _textBuf = new StringBuffer();
+            _currentEdge.initAnnotations();
+        }
+        else if (tagName.equals("text")) {
+            _elementState = TEXT_EDGE_STATE;
+            _textBuf = new StringBuffer();
+			Fig p = handleText(attrList);
+			//_diagram.add(handleText(attrList));
+        }
+		else {
+			_textBuf = new StringBuffer();
+			_elementState = DEFAULT_EDGE_STATE;
+		}
+    }
+
+    public void annotationStateStartElement(String tagName, AttributeList attrList){
+	//System.out.println("[PGMLParser]: annotationStateStartElement: " + tagName + " " + _elementState);
+	if (tagName.equals("text")) {
+	    _elementState = TEXT_ANNOTATION_STATE;
+	    _textBuf = new StringBuffer();
+	    FigText p = handleText(attrList);
+	}
+    }
 
   ////////////////////////////////////////////////////////////////
   // internal parsing methods
 
-  protected void setAttrs(Fig f, TXElement e) {
-    String name = e.getAttribute("name");
+  protected void setAttrs(Fig f, AttributeList attrList) {
+    String name = attrList.getValue("name");
     if (name != null && !name.equals("")) _figRegistry.put(name, f);
-    String x = e.getAttribute("x");
+    String x = attrList.getValue("x");
     if (x != null && !x.equals("")) {
-      String y = e.getAttribute("y");
-      String w = e.getAttribute("width");
-      String h = e.getAttribute("height");
+      String y = attrList.getValue("y");
+      String w = attrList.getValue("width");
+      String h = attrList.getValue("height");
       int xInt = Integer.parseInt(x);
       int yInt = (y == null || y.equals("")) ? 0 : Integer.parseInt(y);
       int wInt = (w == null || w.equals("")) ? 20 : Integer.parseInt(w);
       int hInt = (h == null || h.equals("")) ? 20 : Integer.parseInt(h);
       f.setBounds(xInt, yInt, wInt, hInt);
+        //System.out.println("[PGMLParser]: setAttrs: " + name);
+        //System.out.println("[PGMLParser]: setAttrs: x="+x+" y="+y);
+        //System.out.println("[PGMLParser]: setAttrs: w="+w+" h="+h);
     }
-    String linewidth = e.getAttribute("stroke");
+    String linewidth = attrList.getValue("stroke");
     if (linewidth != null && !linewidth.equals("")) {
       f.setLineWidth(Integer.parseInt(linewidth));
     }
-    String strokecolor = e.getAttribute("strokecolor");
+    String strokecolor = attrList.getValue("strokecolor");
     if (strokecolor != null && !strokecolor.equals(""))
       f.setLineColor(colorByName(strokecolor, Color.blue));
 
-    String fill = e.getAttribute("fill");
+    String fill = attrList.getValue("fill");
     if (fill != null && !fill.equals(""))
       f.setFilled(fill.equals("1") || fill.startsWith("t"));
-    String fillcolor = e.getAttribute("fillcolor");
+    String fillcolor = attrList.getValue("fillcolor");
     if (fillcolor != null && !fillcolor.equals(""))
       f.setFillColor(colorByName(fillcolor, Color.white));
 
-    String dasharray = e.getAttribute("dasharray");
+    String dasharray = attrList.getValue("dasharray");
     if (dasharray != null && !dasharray.equals("") &&
 	!dasharray.equals("solid"))
       f.setDashed(true);
 
+    String dynobjs = attrList.getValue("dynobjects");
+    if (dynobjs != null && dynobjs.length() != 0) {
+      if (f instanceof FigGroup) {
+        FigGroup fg = (FigGroup) f;
+        fg.parseDynObjects(dynobjs);
+      }
+    }
+
+    String context = attrList.getValue("context");
+    if (context != null && !context.equals(""))
+      f.setContext(context);
+
+    setOwnerAttr(f, attrList);
+  }
+
+  protected void setOwnerAttr(Fig f, AttributeList attrList) {
+      //System.out.println("[GEF.PGMLParser]: setOwnerAttr");
     try {
-      String owner = e.getAttribute("href");
-      if (owner != null && !owner.equals("")) f.setOwner(findOwner(owner));
+      String owner = attrList.getValue("href");
+      if (owner != null && !owner.equals("")) {
+          //System.out.println("[GEF.PGMLParser]: setOwnerAttr");
+          f.setOwner(findOwner(owner));
+      }
     }
     catch (Exception ex) {
       System.out.println("could not set owner");
@@ -480,6 +805,62 @@ public class PGMLParser implements ElementHandler, TagHandler {
     return defaultColor;
   }
 
+  protected String translateClassName(String oldName) {
+    return oldName;
+  }
+
+  private String[] _entityPaths = { "/org/tigris/gef/xml/dtd/" };
+  protected String[] getEntityPaths() {
+    return _entityPaths;
+  }
+
+
+   public InputSource resolveEntity(java.lang.String publicId,
+                                 java.lang.String systemId) {
+        InputSource source = null;
+        try {
+            java.net.URL url = new java.net.URL(systemId);
+            try {
+	        source = new InputSource(url.openStream());
+            source.setSystemId(systemId);
+	        if (publicId != null) source.setPublicId(publicId);
+            }
+            catch (java.io.IOException e) {
+	        if (systemId.endsWith(".dtd")) {
+                    int i = systemId.lastIndexOf('/');
+                    i++;	// go past '/' if there, otherwise advance to 0
+                    String[] entityPaths = getEntityPaths();
+                    InputStream is = null;
+                    for(int pathIndex = 0; pathIndex < entityPaths.length && is == null; pathIndex++) {
+                        String DTD_DIR = entityPaths[pathIndex];
+                        is = getClass().getResourceAsStream(DTD_DIR + systemId.substring(i));
+                        if(is == null) {
+                            try {
+                                is = new FileInputStream(DTD_DIR.substring(1) + systemId.substring(i));
+                            }
+                            catch(Exception ex) {}
+                        }
+                    }
+                    if(is != null) {
+                        source = new InputSource(is);
+                        source.setSystemId(systemId);
+                        if(publicId != null) source.setPublicId(publicId);
+                    }
+                }
+            }
+	}
+        catch(Exception ex) {
+        }
+
+        //
+        //   returning an "empty" source is better than failing
+        //
+        if(source == null) {
+            source = new InputSource();
+            source.setSystemId(systemId);
+        }
+        return source;
+   }
 
 } /* end class PGMLParser */
 

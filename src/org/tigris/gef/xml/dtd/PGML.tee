@@ -98,6 +98,7 @@ height="<ocl>self.height.intValue</ocl>"
 <template class="org.tigris.gef.presentation.FigText">
 <![CDATA[
 <text name="<ocl>self.id</ocl>"
+  context="<ocl>self.context</ocl>"
   x="<ocl>self.x.intValue</ocl>"
   y="<ocl>self.y.intValue</ocl>"
   FILL_AND_STROKE
@@ -202,6 +203,10 @@ height="<ocl>self.height.intValue</ocl>"
   </private>
 
   <ocl>self.fig</ocl>
+
+  <annotations>
+      <ocl>self.annotationStrategy.annotationsVector</ocl>
+  </annotations>
 </group>
 ]]>
 </template>

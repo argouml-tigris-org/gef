@@ -58,7 +58,7 @@ public abstract class FigEdge extends Fig implements PropertyChangeListener, Hig
 
     ////////////////////////////////////////////////////////////////
     // inner classes
-    protected class PathItem implements java.io.Serializable {
+    private class PathItem implements java.io.Serializable {
         Fig _fig;
         PathConv _path;
 
@@ -301,7 +301,12 @@ public abstract class FigEdge extends Fig implements PropertyChangeListener, Hig
         return _fig.getPoints();
     }
 
+    /** @deprecated use getPoint(int) */
     public Point getPoints(int i) {
+        return _fig.getPoints(i);
+    }
+
+    public Point getPoint(int i) {
         return _fig.getPoints(i);
     }
 
@@ -615,6 +620,12 @@ public abstract class FigEdge extends Fig implements PropertyChangeListener, Hig
         calcBounds();
     }
 
+    public void setPoint(int i, int x, int y) {
+        _fig.setPoints(i, x, y);
+        calcBounds();
+    }
+
+    /** @deprecated 0.10.2 in favour of setPoint(int,int,int) */
     public void setPoints(int i, int x, int y) {
         _fig.setPoints(i, x, y);
         calcBounds();
@@ -625,6 +636,7 @@ public abstract class FigEdge extends Fig implements PropertyChangeListener, Hig
         calcBounds();
     }
 
+    /** @deprecated 0.10.2 this method does nothing so lets get rid */
     public void setPrivateData(String data) {
         // this method did nothing, so I commented out this Exception throwing code. Toby
         //    StringTokenizer tokenizer = new StringTokenizer(data,"=\"' ");

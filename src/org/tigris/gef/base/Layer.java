@@ -243,13 +243,27 @@ public abstract class Layer implements java.io.Serializable {
      */
     public abstract Collection getContents(Collection c);
 
+    /**
+     * Get the figs that make up this layer.
+     * @return the figs
+     * @deprecated 0.10 This method will be removed in release 0.11
+     * CHECK SAVE IN ARGOUML ONCE REMOVED
+     */
+    public List getContents() {
+        Vector v = new Vector();
+        v.addAll(getContents(null));
+        return v;
+    }
+    
+    /**
+     * @deprecated 0.10.2 in favour of getContentsNoEdges()
+     */
     public Collection getContentsNoEdges(Collection c) {
-        Collection contents = getContents(c);
+        List contents = getContents();
         int size = contents.size();
         if (c == null) c = new ArrayList(size);
-        Iterator it = contents.iterator();
-        while(it.hasNext()) {
-            Object o = it.next();
+        for(int i = 0; i < size; i++) {
+            Object o = contents.get(i);
             if(o instanceof Fig) {
                 if(!((Fig)o).savingAllowed())
                     continue;
@@ -260,13 +274,31 @@ public abstract class Layer implements java.io.Serializable {
         return c;
     }
 
+    public List getContentsNoEdges() {
+        List contents = getContents();
+        int size = contents.size();
+        Vector v = new Vector(size);
+        for(int i = 0; i < size; i++) {
+            Object o = contents.get(i);
+            if(o instanceof Fig) {
+                if(!((Fig)o).savingAllowed())
+                    continue;
+            }
+            if(!(o instanceof FigEdge))
+                v.add(o);
+        }
+        return v;
+    }
+
+    /**
+     * @deprecated 0.10.2 in favour of getContentsNoEdges()
+     */
     public Collection getContentsEdgesOnly(Collection c) {
-        Collection contents = getContents(c);
+        List contents = getContents();
         int size = contents.size();
         if (c == null) c = new ArrayList(size);
-        Iterator it = contents.iterator();
-        while(it.hasNext()) {
-            Object o = it.next();
+        for(int i = 0; i < size; i++) {
+            Object o = contents.get(i);
             if(o instanceof Fig) {
                 if(!((Fig)o).savingAllowed())
                     continue;
@@ -275,6 +307,22 @@ public abstract class Layer implements java.io.Serializable {
                 c.add(o);
         }
         return c;
+    }
+    
+    public List getContentsEdgesOnly() {
+        List contents = getContents();
+        int size = contents.size();
+        Vector v = new Vector(size);
+        for(int i = 0; i < size; i++) {
+            Object o = contents.get(i);
+            if(o instanceof Fig) {
+                if(!((Fig)o).savingAllowed())
+                    continue;
+            }
+            if(o instanceof FigEdge)
+                v.add(o);
+        }
+        return v;
     }
 
     /** Return the list of Editors that are showing this Layer. */

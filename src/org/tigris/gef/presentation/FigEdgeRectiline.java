@@ -30,7 +30,6 @@
 
 package org.tigris.gef.presentation;
 
-import java.util.*;
 import java.awt.*;
 
 /** A Fig that paints edges between ports. This version
@@ -85,8 +84,8 @@ public class FigEdgeRectiline extends FigEdge {
     Point srcPt, dstPt;
     
     if (_useNearest) {
-      srcPt = _sourcePortFig.connectionPoint(p.getPoints(1));
-      dstPt = _destPortFig.connectionPoint(p.getPoints(p.getNumPoints()-2));
+      srcPt = _sourcePortFig.connectionPoint(p.getPoint(1));
+      dstPt = _destPortFig.connectionPoint(p.getPoint(p.getNumPoints()-2));
     }
     else {
       srcPt = _sourcePortFig.center();

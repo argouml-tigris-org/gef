@@ -105,6 +105,10 @@ implements Cloneable, java.io.Serializable, PropertyChangeListener, PopupGenerat
 
   protected Fig _group = null;
 
+    /** True if the Fig is shown. This funct once was in FogComponent of ArgoUML */
+
+  protected boolean _displayed = true;
+
   ////////////////////////////////////////////////////////////////
   // static initializer
 
@@ -380,7 +384,7 @@ implements Cloneable, java.io.Serializable, PropertyChangeListener, PopupGenerat
 	}
 	// needs-more-work: phase not taken into account
 	return (length + phase) % dashesDist;
-  }  
+  }
   protected void drawDashedPerimeter(Graphics g) {
 	Point segStart = new Point();
 	Point segEnd = new Point();
@@ -396,7 +400,7 @@ implements Cloneable, java.io.Serializable, PropertyChangeListener, PopupGenerat
 	  i += _dashes[d];
 	  d = (d + 1) % numDashes;
 	}
-  }  
+  }
   /** This is called after an Cmd mondifies a Fig and the Fig needs to
    * be redrawn in its new position. This also unlocks the
    * RedrawManager. In general, endTrans() should be * paired with a
@@ -405,21 +409,21 @@ implements Cloneable, java.io.Serializable, PropertyChangeListener, PopupGenerat
   public void endTrans() {
 	damage();
 	//RedrawManager.unlock();  // helps avoid dirt
-  }  
-  protected void firePropChange(String propName, int oldV, int newV) {
+  }
+  public void firePropChange(String propName, int oldV, int newV) {
 	firePropChange(propName, new Integer(oldV), new Integer(newV));
-  }  
+  }
   /** Creates a PropertyChangeEvent and calls all registered listeners
    *  propertyChanged() method. */
-  protected void firePropChange(String propName, Object oldV, Object newV) {
+  public void firePropChange(String propName, Object oldV, Object newV) {
 	Globals.firePropChange(this, propName, oldV, newV);
 	if (_group != null) {
 	  PropertyChangeEvent pce =
 	new PropertyChangeEvent(this, propName, oldV, newV);
 	  _group.propertyChange(pce);
 	}
-  }  
-  protected void firePropChange(String propName, boolean oldV, boolean newV) {
+  }
+  public void firePropChange(String propName, boolean oldV, boolean newV) {
 	firePropChange(propName, new Boolean(oldV), new Boolean(newV));
   }  
   /** Return a Rectangle that completely encloses this Fig. */
@@ -437,7 +441,7 @@ implements Cloneable, java.io.Serializable, PropertyChangeListener, PopupGenerat
   public Fig getEnclosingFig() { return null; }  
   public Color getFillColor() { return _fillColor; }  
   public boolean getFilled() { return _filled; }  
-  public int getFilled01() { return _filled ? 1 : 0; }  
+  public int getFilled01() { return _filled ? 1 : 0; }
   public Point getFirstPoint() { return new Point(); }  
   public Vector getGravityPoints() { return null; }  
   public Fig getGroup() { return _group; }  
@@ -552,10 +556,12 @@ public String getPrivateData() {
   /** Method to paint this Fig.  By default it paints an "empty"
    *  space, subclasses should override this method. */
   public void paint(Graphics g) {
+      if ( _displayed ) {
 	g.setColor(Color.pink);
 	g.fillRect(_x, _y, _w, _h);
 	g.setColor(Color.black);
 	g.drawString("(undefined)", _x + _w/2, _y + _h/2);
+      }
   }  
   /** Return a point at the given distance along the path around this
    *  Fig. By default, uses perimeter of the Fig's bounding
@@ -800,4 +806,13 @@ public void setPrivateData(String data)
   public boolean within(Rectangle r) {
 	return r.contains(_x, _y) && r.contains(_x + _w, _y + _h);
   }  
+
+
+   /** Returns true if it is to be displayed. */
+   public boolean isDisplayed() { return _displayed; }
+
+   /** Determine if it is to be displayed. */
+   public void setDisplayed(boolean isDisplayed) { _displayed = isDisplayed; }
+
+
 } /* end class Fig */

@@ -21,8 +21,6 @@
 // CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT,
 // UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
-
-
 // File: MutableGraphModel.java
 // Interfaces: MutableGraphModel
 // Original Author: jrobbins@ics.uci.edu
@@ -55,6 +53,11 @@ public interface MutableGraphModel extends GraphModel {
   /** Return true if the given object is a valid edge in this graph */
   boolean canAddEdge(Object edge);
 
+	/** Return true if the type of the given object can be mapped to
+	 *  a supported type.
+	 */
+	boolean canDragNode(Object node);
+
   /** Remove the given node from the graph. Sends a notification. */
   void removeNode(Object node);
 
@@ -72,7 +75,15 @@ public interface MutableGraphModel extends GraphModel {
 
   /** Remove the given edge from the graph. Sends a notification. */
   void removeEdge(Object edge);
+	
+	/** Create a new node based on the given node and add it to the graph */
+	void dragNode(Object node);
 
+        /** Return true if the connection to the old node can be rerouted to
+         * the new node.
+         */
+        boolean canChangeConnectedNode(Object newNode, Object oldNode, Object edge);
+  
   /** Return true if the two given ports can be connected by a 
    * kind of edge to be determined by the ports. */
   boolean canConnect(Object fromP, Object toP);
@@ -81,6 +92,11 @@ public interface MutableGraphModel extends GraphModel {
    * kind of edge. */
   boolean canConnect(Object fromP, Object toP, Class edgeClass);
 
+  /** Reroutes the connection to the old node to be connected to
+   * the new node.
+   */
+  void changeConnectedNode(Object newNode, Object oldNode, Object edge, boolean isSource);
+  
   /** Contruct and add a new edge of a kind determined by the
    *  ports. Sends a notification.  */
   Object connect(Object fromPort, Object toPort);

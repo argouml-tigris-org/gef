@@ -32,11 +32,13 @@ import javax.swing.border.*;
 import javax.swing.event.*;
 
 import org.tigris.gef.base.*;
-import org.tigris.gef.util.Util;
+import org.tigris.gef.util.*;
 
 public class ToolBar extends JToolBar implements MouseListener {
   protected Vector _lockable = new Vector();
   protected Vector _modeButtons = new Vector();
+  private static final Color selectedBack = new Color(153,153,153);
+  private static final Color buttonBack = new Color(204,204,204);
 
   public ToolBar() {
     setFloatable(false);
@@ -54,29 +56,42 @@ public class ToolBar extends JToolBar implements MouseListener {
   }
 
   public JButton add(Action a, String name, String iconResourceStr) {
-    Icon icon = Util.loadIconResource(iconResourceStr, name);
+    Icon icon = ResourceLoader.lookupIconResource(iconResourceStr, name);
     //System.out.println(icon);
     return add(a, name, icon);
   }
 
   public JButton add(Action a, String name, Icon icon) {
-    JButton b = new JButton(icon);
-    if (a instanceof CmdSetMode || a instanceof CmdCreateNode)
-      _modeButtons.addElement(b);
-    b.setToolTipText(name + " ");
-    b.setEnabled(a.isEnabled());
-    b.addActionListener(a);
-    add(b);
-    if (a instanceof CmdSetMode || a instanceof CmdCreateNode)
-      _lockable.addElement(b);
-    PropertyChangeListener actionPropertyChangeListener =
-      createActionChangeListener(b);
-	if ( actionPropertyChangeListener != null ) {
-		a.addPropertyChangeListener(actionPropertyChangeListener);
-	}
-    b.addMouseListener(this);
-    // needs-more-work: should buttons appear stuck down while action executes?
-    return b;
+//     JButton b = new JButton(icon);
+//     if (a instanceof CmdSetMode || a instanceof CmdCreateNode)
+//       _modeButtons.addElement(b);
+//     b.setToolTipText(name + " ");
+//     b.setEnabled(a.isEnabled());
+//     b.addActionListener(a);
+//     add(b);
+//     if (a instanceof CmdSetMode || a instanceof CmdCreateNode)
+//       _lockable.addElement(b);
+//     PropertyChangeListener actionPropertyChangeListener =
+//       createActionChangeListener(b);
+// 	if ( actionPropertyChangeListener != null ) {
+// 		a.addPropertyChangeListener(actionPropertyChangeListener);
+// 	}
+//     b.addMouseListener(this);
+//     // needs-more-work: should buttons appear stuck down while action executes?
+//     return b;
+
+	  JButton b = super.add(a);
+	  b.setName(null);
+	  b.setText(null);
+	  b.setIcon(icon);
+	  b.setToolTipText(name + " ");
+	  if (a instanceof CmdSetMode || a instanceof CmdCreateNode)
+		  _modeButtons.addElement(b);
+	  if (a instanceof CmdSetMode || a instanceof CmdCreateNode)
+		  _lockable.addElement(b);
+	  b.addMouseListener(this);
+	  // needs-more-work: should buttons appear stuck down while action executes?
+	  return b;
   }
 
   public JToggleButton addToggle(Action a) {
@@ -86,7 +101,7 @@ public class ToolBar extends JToolBar implements MouseListener {
   }
 
   public JToggleButton addToggle(Action a, String name, String iconResourceStr) {
-    Icon icon = Util.loadIconResource(iconResourceStr, name);
+    Icon icon = ResourceLoader.lookupIconResource(iconResourceStr, name);
     //System.out.println(icon);
     return addToggle(a, name, icon);
   }
@@ -106,13 +121,12 @@ public class ToolBar extends JToolBar implements MouseListener {
 
   public JToggleButton addToggle(Action a, String name,
 				 String upRes, String downRes) {
-    ImageIcon upIcon = Util.loadIconResource(upRes, name);
-    ImageIcon downIcon = Util.loadIconResource(downRes, name);
+    ImageIcon upIcon = ResourceLoader.lookupIconResource(upRes, name);
+    ImageIcon downIcon = ResourceLoader.lookupIconResource(downRes, name);
     JToggleButton b = new JToggleButton(upIcon);
     b.setToolTipText(name + " ");
     b.setEnabled(a.isEnabled());
     b.addActionListener(a);
-    b.setPressedIcon(downIcon);
     b.setMargin(new Insets(0,0,0,0));
     add(b);
     PropertyChangeListener actionPropertyChangeListener = 
@@ -200,8 +214,9 @@ public class ToolBar extends JToolBar implements MouseListener {
     if (isModeButton(src)) {
       unpressAllButtonsExcept(src);
       Editor ce = Globals.curEditor();
-      if (ce != null) ce.finishMode();
-      org.tigris.gef.base.Globals.setSticky(false);
+      if (ce != null) 
+          ce.finishMode();
+      Globals.setSticky(false);
     }
     if (me.getClickCount() >= 2) {
       if (!(src instanceof JButton)) return;
@@ -209,7 +224,8 @@ public class ToolBar extends JToolBar implements MouseListener {
       if (canLock(b)) {
 	b.getModel().setPressed(true);
 	b.getModel().setArmed(true);
-	org.tigris.gef.base.Globals.setSticky(true);
+	b.setBackground(selectedBack);
+	Globals.setSticky(true);
       }
     }
     else if (me.getClickCount() == 1) {
@@ -217,6 +233,7 @@ public class ToolBar extends JToolBar implements MouseListener {
 	JButton b = (JButton) src;
 	b.setFocusPainted(false);
 	b.getModel().setPressed(true);
+	b.setBackground(selectedBack);
       }
     }
   }
@@ -234,10 +251,13 @@ public class ToolBar extends JToolBar implements MouseListener {
     int size = getComponentCount();
     for (int i = 0; i < size; i++) {
       Component c = getComponent(i);
-      if (!(c instanceof JButton)) continue;
-      if (c == src) continue;
+      if (!(c instanceof JButton)) 
+          continue;
+      if (c == src) 
+          continue;
       ((JButton)c).getModel().setArmed(false);
       ((JButton)c).getModel().setPressed(false);
+      ((JButton)c).setBackground(buttonBack);
     }
   }
 
@@ -248,6 +268,7 @@ public class ToolBar extends JToolBar implements MouseListener {
       if (!(c instanceof JButton)) continue;
       ((JButton)c).getModel().setArmed(false);
       ((JButton)c).getModel().setPressed(false);
+      ((JButton)c).setBackground(buttonBack);
     }
     // press the first button (usually ModeSelect)
     for (int i = 0; i < size; i++) {
@@ -256,6 +277,7 @@ public class ToolBar extends JToolBar implements MouseListener {
       JButton select = (JButton) c;
       select.getModel().setArmed(true);
       select.getModel().setPressed(true);
+      select.setBackground(selectedBack);
       return;
     }
   }

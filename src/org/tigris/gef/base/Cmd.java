@@ -21,9 +21,6 @@
 // CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT,
 // UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
-
-
-
 // File: Action.java
 // Classes: Action
 // Original Author: jrobbins@ics.uci.edu
@@ -35,7 +32,7 @@ import java.util.*;
 import java.awt.event.*;
 import javax.swing.*;
 
-import org.tigris.gef.util.Util;
+import org.tigris.gef.util.*;
 
 /** Abstract class for all editor commands. The editor serves as a
  *  command shell for executing actions in much the same way that a
@@ -64,47 +61,47 @@ implements java.io.Serializable {
   ////////////////////////////////////////////////////////////////
   // constants
 
-  // by default, every command has an icon
-  public static final boolean HAS_ICON = true;
-  public static final boolean NO_ICON = false;
-
   ////////////////////////////////////////////////////////////////
   // instance variables
 
   /** Arguments that configure the Cmd instance. */
-  protected Hashtable _args;
+	protected Hashtable _args;
+	protected String _resource;
 
   ////////////////////////////////////////////////////////////////
   // constructors
 
   /** Construct a new Cmd with the given arguments */
-  public Cmd(Hashtable args, String name) {
-    super(name);
-    Icon icon = Util.loadIconResource(name, name);
+  public Cmd(Hashtable args, String resource, String name) {
+    super(Localizer.localize(resource,name));
+    Icon icon = ResourceLoader.lookupIconResource(name, name);
     if (icon != null) putValue(Action.SMALL_ICON, icon);
     _args = args;
+	_resource = resource;
   }
 
-  public Cmd(Hashtable args, String name, boolean hasIcon) {
-    super(name);
-    if (hasIcon) {
-      Icon icon = Util.loadIconResource(name, name);
-      if (icon != null) putValue(Action.SMALL_ICON, icon);
-    }
+  public Cmd(String resource, String name) {
+    this (null, resource, name);
+  }
+
+  public Cmd(Hashtable args, String resource, String name, ImageIcon icon) {
+    super(Localizer.localize(resource,name), icon);
     _args = args;
+	_resource = resource;
   }
 
-  public Cmd(String name, boolean hasIcon) {
-    this (null, name, hasIcon);
-  }
+	/** Constructors with no resource name */
+	protected Cmd(String name) {
+		this(null, "GefBase", name);
+	}
 
-  public Cmd(Hashtable args, String name, ImageIcon icon) {
-    super(name, icon);
-    _args = args;
-  }
+	protected Cmd(Hashtable args, String name, ImageIcon icon) {
+		this(args, "GefBase", name, icon);
+	}
 
-  /** Construct a new Cmd with no arguments */
-  public Cmd(String name) { this(null, name); }
+	protected Cmd(Hashtable args, String name) {
+		this(args, "GefBase", name);
+	}
 
   ////////////////////////////////////////////////////////////////
   // enabling and disabling
@@ -124,9 +121,16 @@ implements java.io.Serializable {
   ////////////////////////////////////////////////////////////////
   // accessors
 
+	/**
+	 * Set a new resource as basis for the localization of this command.
+	 */
+	public void setResource(String resource) { _resource = resource; }
+
+	public String getResource() { return _resource; }
+
   /** Return a name for this Cmd suitable for display to the user */
   public String getName() { return (String) getValue(NAME); }
-  public void setName(String n) { putValue(NAME, n); }
+  public void setName(String n) { putValue(NAME, Localizer.localize(_resource,n)); }
 
   /** Get the object stored as an argument under the given name. */
   protected Object getArg(String key) {
@@ -162,7 +166,7 @@ implements java.io.Serializable {
    *  <TT>FEATURE: view_Cmd_documentation</TT></A>
    */
   public String about() {
-    return "http://www.ics.uci.edu/~jrobbins/gef/Docs.html#" +
+    return "http://gef.tigris.org" +
 		 getClass().getName();
   }
 

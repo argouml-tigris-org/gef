@@ -81,8 +81,8 @@ public class FigEdgePoly extends FigEdge {
    *  Needs-More-Work: Sometimes the edge can get non-rectilinear. */
   public void computeRoute() {
     if (!_initiallyLaidOut) {
-      layoutEdge();
-      _initiallyLaidOut = true;
+	layoutEdge();
+	_initiallyLaidOut = true;
     }
     FigPoly p = ((FigPoly) _fig);
 
@@ -114,41 +114,26 @@ public class FigEdgePoly extends FigEdge {
     int npoints = 0;
     int xpoints[] = new int[16];
     int ypoints[] = new int[16];
+	//System.out.println("[FigEdgePoly] layoutEdge: " + _sourcePortFig + " / " + _destPortFig);
     Point srcPt = _sourcePortFig.center();
     Point dstPt = _destPortFig.center();
 
     if (_useNearest) {
+      int xdiff = (srcPt.x-dstPt.x);
+      int ydiff = (srcPt.y-dstPt.y);
+      srcPt.x = (int) (srcPt.x - 0.1*xdiff);
+      srcPt.y = (int) (srcPt.y - 0.1*ydiff);
+      dstPt.x = (int) (dstPt.x + 0.1*xdiff);
+      dstPt.y = (int) (dstPt.y + 0.1*ydiff);
       srcPt = _sourcePortFig.connectionPoint(dstPt);
       dstPt = _destPortFig.connectionPoint(srcPt);
       srcPt = _sourcePortFig.connectionPoint(dstPt);
       dstPt = _destPortFig.connectionPoint(srcPt);
     }
-    
-    Rectangle srcRR = _sourceFigNode.routingRect();
-    Rectangle dstRR = _destFigNode.routingRect();
 
-    Object srcPort = _sourcePortFig.getOwner();
-    Object dstPort = _destPortFig.getOwner();
-    int srcSector = _sourceFigNode.getPortSector(_sourcePortFig);
-    int dstSector = _destFigNode.getPortSector(_destPortFig);
-
-    // first decide what layout case we have
-    Point srcRRPt = routingRectPoint(srcPt, srcRR, srcSector);
-    Point dstRRPt = routingRectPoint(dstPt, dstRR, dstSector);
-
-    if (srcSector == 1 || srcSector == -1) {
-      xpoints[npoints] = srcPt.x; ypoints[npoints++] = srcPt.y; }
     xpoints[npoints] = srcPt.x; ypoints[npoints++] = srcPt.y;
-    xpoints[npoints] = srcRRPt.x; ypoints[npoints++] = srcRRPt.y;
-
-    npoints = npoints + tryRoute(dstRRPt.x, dstRRPt.y, npoints,
-				 xpoints, ypoints,
-				 srcRR, dstRR, srcSector, dstSector);
-
-    xpoints[npoints] = dstRRPt.x; ypoints[npoints++] = dstRRPt.y;
     xpoints[npoints] = dstPt.x; ypoints[npoints++] = dstPt.y;
-    //   if (dstSector == 1 || dstSector == -1) {
-    // xpoints[npoints] = dstPt.x; ypoints[npoints++] = dstPt.y; }
+
     Polygon routePoly = new Polygon(xpoints, ypoints, npoints);
     ((FigPoly)_fig).setPolygon(routePoly);
   }
@@ -301,7 +286,7 @@ public class FigEdgePoly extends FigEdge {
           }
         }
       }
-      p._xpoints[i] = x; 
+      p._xpoints[i] = x;
       p._ypoints[i] = y;
     }
   }

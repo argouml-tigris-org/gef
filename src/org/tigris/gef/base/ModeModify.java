@@ -21,9 +21,6 @@
 // CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT,
 // UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
-
-
-
 // File: ModeModify.java
 // Classes: ModeModify
 // Original Author: ics125 spring 1996
@@ -46,7 +43,7 @@ import org.tigris.gef.presentation.*;
  * @see Selection
  */
 
-public class ModeModify extends Mode {
+public class ModeModify extends FigModifyingModeImpl {
   ////////////////////////////////////////////////////////////////
   // constants
 
@@ -162,7 +159,7 @@ public class ModeModify extends Mode {
     sm.startTrans();
     if (_curHandle.index == -1) {
       setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
-      if (legal(dx, dy, sm, me)) {
+      if (legal(dx, dy, sm, me) && !outOfBounds(dx,dy,me,sm)) {
 	sm.translate(dx, dy);
 	_lastX = snapX; _lastY = snapY;
       }
@@ -176,7 +173,7 @@ public class ModeModify extends Mode {
     //Note: if _curHandle.index == -2 then do nothing
 
     sm.endTrans();
-    //_editor.scrollToShow(snapX, snapY);
+    //editor.scrollToShow(snapX, snapY);
     me.consume();
   }
 
@@ -212,38 +209,40 @@ public class ModeModify extends Mode {
 
   /** On mouse up the modification interaction is done. */
   public void mouseReleased(MouseEvent me) {
-    if (me.isConsumed()) return;
-    done();
-    me.consume();
-    SelectionManager sm = getEditor().getSelectionManager();
-    Vector figs = sm.getFigs();
-    Enumeration sels = figs.elements();
-    while (sels.hasMoreElements()) {
-      Fig selectedFig = (Fig) sels.nextElement();
-      if (!(selectedFig instanceof FigNode)) continue;
-      Rectangle bbox = selectedFig.getBounds();
-//       Fig oldEncloser = selectedFig.getEnclosingFig();
-//       if (oldEncloser != null && oldEncloser.contains(bbox))
-// 	continue;
-      Layer lay = selectedFig.getLayer();
-      Vector otherFigs = lay.getContents();
-      Enumeration others = otherFigs.elements();
-      Fig encloser = null;
-      while (others.hasMoreElements()) {
-        Fig otherFig = (Fig) others.nextElement();
-        if (!(otherFig instanceof FigNode)) continue;
-	if (!(otherFig.getUseTrapRect())) continue;
-        //if (figs.contains(otherFig)) continue;
-        Rectangle trap = otherFig.getTrapRect();
-	if (trap == null) continue;
-        // now bbox is where the fig _will_ be
-        if ((trap.contains(bbox.x, bbox.y) &&
-             trap.contains(bbox.x + bbox.width, bbox.y + bbox.height))) {
-           encloser = otherFig;
-           }
+      if (me.isConsumed()) return;
+      done();
+      me.consume();
+      SelectionManager sm = getEditor().getSelectionManager();
+      Vector figs = sm.getFigs();
+      Enumeration sels = figs.elements();
+      while (sels.hasMoreElements()) {
+          Fig selectedFig = (Fig) sels.nextElement();
+          if ((selectedFig instanceof FigNode)) {
+              Rectangle bbox = selectedFig.getBounds();
+              Layer lay = selectedFig.getLayer();
+              Vector otherFigs = lay.getContents();
+              Enumeration others = otherFigs.elements();
+              Fig encloser = null;
+              while (others.hasMoreElements()) {
+                  Fig otherFig = (Fig) others.nextElement();
+                  if (!(otherFig instanceof FigNode)) continue;
+                  if (!(otherFig.getUseTrapRect())) continue;
+                  //if (figs.contains(otherFig)) continue;
+                  Rectangle trap = otherFig.getTrapRect();
+                  if (trap == null) continue;
+                  // now bbox is where the fig _will_ be
+                  if ((trap.contains(bbox.x, bbox.y) &&
+                  trap.contains(bbox.x + bbox.width, bbox.y + bbox.height))) {
+                      encloser = otherFig;
+                  }
+              }
+              selectedFig.setEnclosingFig(encloser);
+          }
+          else if (selectedFig instanceof FigEdge) {
+              ((FigEdge)selectedFig).computeRoute();
+              selectedFig.endTrans();
+          }
       }
-      selectedFig.setEnclosingFig(encloser);
-    }
   }
 
   public void start() {
@@ -256,7 +255,7 @@ public class ModeModify extends Mode {
     SelectionManager sm = getEditor().getSelectionManager();
     sm.cleanUp();
     if (_highlightTrap != null) {
-      _editor.damaged(_highlightTrap);
+      editor.damaged(_highlightTrap);
       _highlightTrap = null;
     }
   }
@@ -285,7 +284,7 @@ public class ModeModify extends Mode {
   }
 
   protected boolean legal(int dx, int dy, SelectionManager sm, MouseEvent me) {
-    if (_highlightTrap != null) _editor.damaged(_highlightTrap);
+    if (_highlightTrap != null) editor.damaged(_highlightTrap);
     _highlightTrap = null;
     Vector figs = sm.getFigs();
     Enumeration sels = figs.elements();
@@ -317,11 +316,81 @@ public class ModeModify extends Mode {
         if ((bbox.contains(trap.x, trap.y) &&
 	     bbox.contains(trap.x + trap.width, trap.y + trap.height))) continue;
 	_highlightTrap = trap;
-	_editor.damaged(_highlightTrap);
+	editor.damaged(_highlightTrap);
         return false;
       }
     }
     return true;
   }
+
+  /**
+   * This method will check to see if the selection bein moved will end up
+   * off the screen and off the diagram. There is just no easy way to do this
+   * especially because there could be more than one fig selected!
+   *
+   * @param dx - horizontal distance to move
+   * @param dy - vertical distance to move
+   * @param me - the mouse event
+   * @param sm - the selection manager
+   * @returns boolean - is it out of bounds? ( T / F )
+   */
+  protected boolean outOfBounds(int dx, int dy, MouseEvent me, SelectionManager sm) {
+
+   Rectangle selectionBox = sm.getContentBounds();
+
+   int selectionHeight = (int)selectionBox.getHeight();
+   int selectionWidth = (int)selectionBox.getWidth();
+
+   // Get top-left most point of the whole selection
+   Point selectionOrigin = sm.getLocation();
+
+   int selectionOriginX = (int)selectionOrigin.getX();
+   int selectionOriginY = (int)selectionOrigin.getY();
+
+   int targetY = me.getY();
+   int targetX = me.getX();
+
+   // These offsets tell us where the drag point is in relation to
+   // the selection it is in.  We need this information so that we don't
+   // let varying parts of the selection go outside the bounds just because
+   // the drag point was in different parts of the selection
+
+   int topVerticalOffset = _lastY - selectionOriginY;
+   int bottomVerticalOffset = selectionOriginY + selectionHeight - _lastY;
+
+   int leftHorizontalOffset = _lastX - selectionOriginX;
+   int rightHorizontalOffset = selectionOriginX + selectionWidth - _lastX;
+
+   /*
+    *  OK, what we're saying here is that if the destination point is less than
+    *  zero, forget it.  But if you move less than zero, but part of your figure
+    *  would be in the negative zone, you cannot do that either.
+    */
+
+   // Check top
+   if ((targetY < 0 ) || (targetY < topVerticalOffset) ) return true;
+
+   // Check bottom
+
+   int canvasBottomEdge = me.getComponent().getHeight();
+
+   if ((targetY > canvasBottomEdge ) ||
+      ((targetY + bottomVerticalOffset) > canvasBottomEdge ) ) return true;
+
+   // Check left
+   if ((targetX < 0 ) || (targetX < leftHorizontalOffset) ) return true;
+
+   // Check right
+
+   int canvasRightEdge = me.getComponent().getWidth();
+
+   if ((targetX > canvasRightEdge ) ||
+      ((targetX + rightHorizontalOffset) > canvasRightEdge ) ) return true;
+
+
+   // Otherwise we're ok!
+    return false;
+  }
+
 } /* end class ModeModify */
 

@@ -45,7 +45,7 @@ import org.tigris.gef.persistence.*;
 public class CmdSaveEPS extends CmdSaveGraphics {
 
   public CmdSaveEPS() {
-    super("Save Encapsulated PostScript...", NO_ICON);
+    super("SaveEncapsulatedPostScript");
   }
 
   protected void saveGraphics(OutputStream s, Editor ce,
@@ -53,6 +53,7 @@ public class CmdSaveEPS extends CmdSaveGraphics {
                  throws IOException {
 	  System.out.println("Writing Encapsulated PostScript...");
       PostscriptWriter ps = new PostscriptWriter(s, drawingArea);
+      ps.translate(-drawingArea.x,-drawingArea.y);
       ce.print(ps);
       ps.dispose();
 	  System.out.println("Wrote Encapsulated PostScript.");

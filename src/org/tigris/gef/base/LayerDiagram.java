@@ -96,7 +96,7 @@ public class LayerDiagram extends Layer {
   /** Add a Fig to the contents of this layer. Items are
    *  added on top of all other items. */
   public void add(Fig f) {
-    if (Dbg.on) Dbg.assert(f != null, "tried to add null Fig");
+    if (Dbg.on) Dbg.assertTrue(f != null, "tried to add null Fig");
     _contents.removeElement(f); // act like a set
     _contents.addElement(f);
     f.setLayer(this);
@@ -106,7 +106,7 @@ public class LayerDiagram extends Layer {
   /** Add a Fig to the contents of this layer. Items are
    *  added on top of all other items. */
   public void insertAt(Fig f, int index) {
-    if (Dbg.on) Dbg.assert(f != null, "tried to insert null Fig");
+    if (Dbg.on) Dbg.assertTrue(f != null, "tried to insert null Fig");
     _contents.removeElement(f); // act like a set
     _contents.insertElementAt(f, index);
     f.setLayer(this);
@@ -116,7 +116,7 @@ public class LayerDiagram extends Layer {
   /** Add a Fig to the contents of this layer. Items are
    *  added on top of all other items. */
   public int indexOf(Fig f) {
-    if (Dbg.on) Dbg.assert(f != null, "tried to find null Fig");
+    if (Dbg.on) Dbg.assertTrue(f != null, "tried to find null Fig");
     return _contents.indexOf(f);
   }
 
@@ -163,9 +163,9 @@ public class LayerDiagram extends Layer {
     while (figs.hasMoreElements()) {
       Fig f = (Fig) figs.nextElement();
       if (f instanceof FigNode) {
-	FigNode fn = (FigNode) f;
-	Fig port_fig = fn.getPortFig(port);
-	if (port_fig != null) return fn;
+    FigNode fn = (FigNode) f;
+    Fig port_fig = fn.getPortFig(port);
+    if (port_fig != null) return fn;
       }
     }
     return null;
@@ -208,13 +208,17 @@ public class LayerDiagram extends Layer {
     Enumeration figs = elements();
     while (figs.hasMoreElements()) {
       Fig fig = (Fig) figs.nextElement();
-      if (clip == null || fig.getBounds().intersects(clip)) {
+      if (   clip == null
+          // || fig.getBounds().intersects(clip))
+          || fig.intersects(clip))  // In Java 1.4 Rectangle.intersects(r) returns false if r has zero height or width
+                                    // (e.g. horizontal or vertical lines). Better use our own definition.
+      {
           if (painter==null)
              fig.paint(g);
           else
              painter.paint(g,fig);
       }
-     
+
     }
   }
 

@@ -44,11 +44,14 @@ import java.awt.Event;
 
 public class CmdDelete extends Cmd {
 
-  public CmdDelete() { super("Delete from Diagram", NO_ICON); }
+  public CmdDelete() {
+	  super("DeleteFromDiagram");
+  }
 
   /** Tell the selected Figs to remove themselves from the
    *  the diagram it is in (and thus all editors). */
   public void doIt() {
+	  System.out.println("[CmdDelete] doIt");
     Editor ce = Globals.curEditor();
     SelectionManager sm = ce.getSelectionManager();
     sm.delete();

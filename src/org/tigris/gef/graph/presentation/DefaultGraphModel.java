@@ -21,8 +21,6 @@
 // CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT,
 // UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
-
-
 // File: DefaultGraphModel.java
 // Interfaces: DefaultGraphModel
 // Original Author: jrobbins@ics.uci.edu
@@ -143,7 +141,9 @@ implements java.io.Serializable {
     _netList.removeNode(n);
     fireNodeRemoved(n);
   }
-
+   
+	/** Return true if dragging the given object is a valid in this graph */
+	public boolean canDragNode(Object node) { return (node instanceof NetNode); }                                      
   /** Add the given node to the graph, if valid. */
   public void addNode(Object node) {
     NetNode n = (NetNode) node;
@@ -168,7 +168,11 @@ implements java.io.Serializable {
     fireEdgeRemoved(e);
   }
 
-  /** Return true if the two given ports can be connected by a 
+	public void dragNode(Object node) {
+		addNode(node);
+	}                                                                                                                  
+
+        /** Return true if the two given ports can be connected by a 
    * kind of edge to be determined by the ports. */
   public boolean canConnect(Object srcPort, Object destPort) {
     if (srcPort instanceof NetPort && destPort instanceof NetPort) {
@@ -225,4 +229,17 @@ implements java.io.Serializable {
     return e;
   }
 
+  /** Return true if the connection to the old node can be rerouted to
+   * the new node.
+   */
+  public boolean canChangeConnectedNode(Object newNode, Object oldNode, Object edge) {
+      return false;
+  }
+  
+  /** Reroutes the connection to the old node to be connected to
+   * the new node.
+   */
+  public void changeConnectedNode(Object newNode, Object oldNode, Object edge, boolean isSource) {
+  }
+  
 } /* end class DefaultGraphModel */

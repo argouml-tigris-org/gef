@@ -21,8 +21,6 @@
 // CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT,
 // UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
-
-
 // File: Editor.java
 // Classes: Editor
 // Original Author: ics125 spring 1996
@@ -39,6 +37,7 @@ import javax.swing.*;
 import org.tigris.gef.graph.*;
 import org.tigris.gef.presentation.*;
 import org.tigris.gef.event.*;
+import org.tigris.gef.util.logging.LogManager;
 
 /** This class provides an editor for manipulating graphical
  *  documents. The editor is the central class of the graph editing
@@ -129,6 +128,9 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
   /** The Selection object that the mouse is in. */
   protected Selection _curSel = null;
 
+  /** The scale at which to draw the diagram */
+  protected double _scale = 1.0;
+
   /** The AWT window or panel that the Editor draws to. */
   private transient Component _awt_component;
 
@@ -216,10 +218,10 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
       return ed;
     }
     catch (java.lang.IllegalAccessException ignore) {
-      System.out.println("IllegalAccessException in spawn");
+      LogManager.log.error("IllegalAccessException in spawn");
     }
     catch (java.lang.InstantiationException ignore) {
-      System.out.println("InstantiationException in spawn");
+      LogManager.log.error("InstantiationException in spawn");
     }
     return null;
   }
@@ -230,7 +232,7 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
   public ModeManager getModeManager() { return _modeManager; }
 
   /** Set the current user interface mode to the given Mode instance. */
-  public void mode(Mode m) {
+  public void mode(FigModifyingMode m) {
     _modeManager.push(m);
     m.setEditor(this);
     Globals.showStatus(m.instructions());
@@ -239,7 +241,7 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
   /** Set this Editor's current Mode to the next global Mode. */
   public void finishMode() {
     _modeManager.pop();
-    mode(Globals.mode());
+    mode((FigModifyingMode)Globals.mode());
     Globals.clearStatus();
   }
 
@@ -249,6 +251,14 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
 
   /** The size of the grid for grid snap. */
   //  public int gridSize() { return 16; } // Needs-More-Work: prefs
+
+  /** Return this Editor's current display scale. */
+  public double getScale() { return _scale; }
+
+  /** Set this Editor's drawing scale.  A value of 1.0 draws at 1 to 1.
+      A value greater than 1 draws larger, less than 1 draws smaller.
+      Values equal to or less than 0 will be silently rejected. */
+  public void setScale(double scale) { if (_scale > 0) _scale = scale; }
 
   /** Return the net under the diagram being edited. */
   public GraphModel getGraphModel() {
@@ -372,8 +382,7 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
    *  damaged region (rectangle) to this Editor's RedrawManager.   */
   public void damaged(Rectangle r) {
     //- _redrawer.add(r);
-     ((JComponent) getAwtComponent()).repaint(1000, r.x-32, r.y-32,
-     					     r.width+64, r.height+64);
+     ((JComponent) getAwtComponent()).repaint();
   }
 
   public void damaged(Fig f) {
@@ -381,8 +390,7 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
     // the line above should not be needed, but without it I get
     // NullPointerExceptions...
     //- if (f != null) _redrawer.add(f);
-    ((JComponent) getAwtComponent()).repaint(1000, f.getX()-32, f.getY()-32,
-					     f.getWidth()+64, f.getHeight()+64);
+    ((JComponent) getAwtComponent()).repaint();
   }
 
   public void damaged(Selection sel) {
@@ -401,7 +409,6 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
     Dimension size = getAwtComponent().getSize();
     //- _redrawer.add(new Rectangle(0, 0, size.width, size.height));
     ((JComponent) getAwtComponent()).repaint();
-
   }
 
   /** Tell my RedrawManager to repair all outstanding damaged regions
@@ -409,9 +416,9 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
    *  already gets called periodically from another thread of
    *  control. You should call it if you need a very tight user
    *  interface feedback loop... */
-  public void repairDamage() {
-    //- _redrawer.repairDamage();
-  }
+//    public void repairDamage() {
+//      //- _redrawer.repairDamage();
+//    }
 
   ////////////////////////////////////////////////////////////////
   // display methods
@@ -422,10 +429,14 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
    *
    * @see RedrawManager */
   public synchronized void paint(Graphics g) {
+    if (g instanceof Graphics2D) {
+	Graphics2D g2 = (Graphics2D) g;
+	g2.scale(_scale, _scale);
+    }
     getLayerManager().paint(g);
     _selectionManager.paint(g);
     _modeManager.paint(g);
-    if (_activeTextEditor != null) _activeTextEditor.repaint();
+    //if (_activeTextEditor != null) _activeTextEditor.repaint();
   }
 
   public synchronized void print(Graphics g) {
@@ -439,7 +450,7 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
    *  is commented out right now because it causes too many out of
    *  memory errors and the size of the JGraphInternalPanel is not set
    *  properly. */
-  public void scrollToShow(int x, int y) {  
+  public void scrollToShow(int x, int y) {
     //   Component c = getAwtComponent();
     //   if (c != null && c.getParent() instanceof JViewport) {
     //     JViewport view = (JViewport) c.getParent();
@@ -462,6 +473,7 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
   }
 
   public void setActiveTextEditor(FigTextEditor fte) {
+	  LogManager.log.debug("[Editor] setActiveTextEditor");
     FigTextEditor oldTextEditor = _activeTextEditor;
     _activeTextEditor = fte;
     if (oldTextEditor != null)
@@ -554,11 +566,32 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
   ////////////////////////////////////////////////////////////////
   // JDK 1.1 AWT event handlers
 
-
+  /** Scales the mouse coordinates (which match the drawing scale)
+    * back to the model scale. */
+  protected MouseEvent translateMouseEvent(MouseEvent me) {
+    double xp = me.getX();
+    double yp = me.getY();
+    me.translatePoint((int) Math.round((xp / _scale) - me.getX()),
+		      (int) Math.round((yp / _scale) - me.getY()));
+    return me;
+  }
+  
+ /** Scales the mouse coordinates (which match the model scale)
+  * back to the drawing scale. */
+  public MouseEvent retranslateMouseEvent(MouseEvent me) {
+    double xp = me.getX();
+    double yp = me.getY();
+    int dx = (int)(xp * _scale - xp);
+    int dy = (int)(yp * _scale - yp);
+    me.translatePoint(dx, dy);
+    return me;
+  }
+  
   /** Invoked after the mouse has been pressed and released.  All
    *  events are passed on the SelectionManager and then ModeManager. */
   public void mouseClicked(MouseEvent me) { 
     //- RedrawManager.lock();
+    translateMouseEvent(me);
     Globals.curEditor(this);
     //setUnderMouse(me);
     if (_curFig instanceof MouseListener)
@@ -572,6 +605,7 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
   /** Invoked when a mouse button has been pressed. */
   public void mousePressed(MouseEvent me) {
     if (me.isConsumed()) return;
+    translateMouseEvent(me);
     setActiveTextEditor(null);
     //if (getAwtComponent() != null) getAwtComponent().requestFocus();
     //- RedrawManager.lock();
@@ -588,6 +622,7 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
   /** Invoked when a mouse button has been released. */
   public void mouseReleased(MouseEvent me) {
     //- RedrawManager.lock();
+    translateMouseEvent(me);
     Globals.curEditor(this);
     //setUnderMouse(me);
     if (_curFig instanceof MouseListener)
@@ -603,8 +638,9 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
     if (_activeTextEditor != null) _activeTextEditor.requestFocus();
     else if (_awt_component != null) _awt_component.requestFocus();
     //- RedrawManager.lock();
+    translateMouseEvent(me);
     Globals.curEditor(this);
-    mode(Globals.mode());
+    mode((FigModifyingMode)Globals.mode());
     setUnderMouse(me);
     _modeManager.mouseEntered(me);
     //- RedrawManager.unlock();
@@ -614,6 +650,7 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
   /** Invoked when the mouse exits the Editor. */
   public void mouseExited(MouseEvent me) {
     //- RedrawManager.lock();
+    translateMouseEvent(me);
     // Globals.curEditor(this);
     setUnderMouse(me);
     if (_curFig instanceof MouseListener)
@@ -630,6 +667,7 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
    *  almost impossible.  */
   public void mouseDragged(MouseEvent me) {
     //- RedrawManager.lock();
+    translateMouseEvent(me);
     Globals.curEditor(this);
     setUnderMouse(me);
     _selectionManager.mouseDragged(me);
@@ -641,6 +679,7 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
   /** Invoked when the mouse button has been moved (with no buttons no down). */
   public void mouseMoved(MouseEvent me) {
     //- RedrawManager.lock();
+    translateMouseEvent(me);
     Globals.curEditor(this);
     setUnderMouse(me);
     if (_curFig != null && Globals.getShowFigTips()) {
@@ -701,7 +740,7 @@ implements Serializable, MouseListener, MouseMotionListener, KeyListener {
     if (c == null) return;
     try { c.doIt(); }
     catch (java.lang.Throwable ex) {
-      System.out.println("While executing " + c +
+      LogManager.log.debug("While executing " + c +
 			 " on event " + ie +
 			 " the following error occured:");
       ex.printStackTrace();

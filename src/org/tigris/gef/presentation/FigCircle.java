@@ -39,54 +39,92 @@ import java.util.*;
 
 public class FigCircle extends Fig {
 
-  ////////////////////////////////////////////////////////////////
-  // constants
+    ////////////////////////////////////////////////////////////////
+    // constants
 
-  /** Used as a percentage tolerance for making it easier for the user
-   *  to select a hollow circle with the mouse. Needs-More-Work: This
-   *  is bad design that needs to be changed. Should use just
-   *  GRIP_FACTOR. */
-  public static final double CIRCLE_ADJUST_RADIUS = 0.1;
+    /** Used as a percentage tolerance for making it easier for the user
+     *  to select a hollow circle with the mouse. Needs-More-Work: This
+     *  is bad design that needs to be changed. Should use just
+     *  GRIP_FACTOR. */
+    public static final double CIRCLE_ADJUST_RADIUS = 0.1;
 
-  ////////////////////////////////////////////////////////////////
-  // constructors
+    protected boolean _isDashed = false;
 
-  /** Construct a new FigCircle with the given position, size, and
-   *  attributes. */
-  public FigCircle(int x, int y, int w, int h) {
-    super(x, y, w, h);
-  }
+    ////////////////////////////////////////////////////////////////
+    // constructors
 
-  /** Construct a new FigCircle with the given position, size, line
-   *  color, and fill color */
-
-  public FigCircle(int x, int y, int w, int h, Color lColor, Color fColor) {
-    super(x, y, w, h, lColor, fColor);
-  }
-
-  ////////////////////////////////////////////////////////////////
-  // display methods
-
-  /** Draw this FigCircle. */
-  public void paint(Graphics g) {
-    if (_filled && _fillColor != null) {
-      g.setColor(_fillColor);
-      g.fillOval(_x, _y, _w, _h);
+    /** Construct a new FigCircle with the given position, size, and
+     *  attributes. */
+    public FigCircle(int x, int y, int w, int h) {
+        super(x, y, w, h);
     }
-    if (_lineWidth > 0 && _lineColor != null) {
-      g.setColor(_lineColor);
-      g.drawOval(_x, _y, _w - _lineWidth, _h - _lineWidth);
-    }
-  }
 
-  /** Reply true if the given coordinates are inside the circle. */
-  public boolean contains(int x, int y) {
-    if (!super.contains(x, y)) return false;
-    double dx = ((double)(_x + _w/2 - x)) * 2 / _w;
-    double dy = ((double)(_y + _h/2 - y)) * 2 / _h;
-    double distSquared = dx * dx + dy * dy;
-    return distSquared <= 1.01;
-  }
+    /** Construct a new FigCircle with the given position, size, line
+     *  color, and fill color */
+
+    public FigCircle(int x, int y, int w, int h, Color lColor, Color fColor) {
+        super(x, y, w, h, lColor, fColor);
+    }
+
+    ////////////////////////////////////////////////////////////////
+    // display methods
+
+    /** Draw this FigCircle. */
+    public void paint(Graphics g) {
+        if (getDashed() && (g instanceof Graphics2D)) {
+            Graphics2D g2d = (Graphics2D) g;
+            Stroke oldStroke = g2d.getStroke();
+            float dash[] = { 10.0f, 10.0f };
+            Stroke stroke = new BasicStroke(0.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
+                1.0f, dash, 0.0f);
+
+            g2d.setStroke(stroke);
+            if (_filled && _fillColor != null) {
+                g.setColor(_fillColor);
+                g.fillOval(_x, _y, _w, _h);
+            }
+            if (_lineWidth > 0 && _lineColor != null) {
+                g.setColor(_lineColor);
+                g.drawOval(_x, _y, _w - _lineWidth, _h - _lineWidth);
+            }
+
+            g2d.setStroke(oldStroke);
+        }
+        else {
+            if (_filled && _fillColor != null) {
+                g.setColor(_fillColor);
+                g.fillOval(_x, _y, _w, _h);
+            }
+            if (_lineWidth > 0 && _lineColor != null) {
+                g.setColor(_lineColor);
+                g.drawOval(_x, _y, _w - _lineWidth, _h - _lineWidth);
+            }
+        }
+    }
+
+
+
+    /** Reply true if the given coordinates are inside the circle. */
+    public boolean contains(int x, int y) {
+        if (!super.contains(x, y)) return false;
+        double dx = ((double)(_x + _w/2 - x)) * 2 / _w;
+        double dy = ((double)(_y + _h/2 - y)) * 2 / _h;
+        double distSquared = dx * dx + dy * dy;
+        return distSquared <= 1.01;
+    }
+
+    /** Calculate border point of elipse */
+    public Point connectionPoint(Point anotherPt) {
+      double rx = _w/2;
+      double ry = _h/2;
+      double dx = anotherPt.x - _x;
+      double dy = anotherPt.y - _y;
+      double dd = ry*ry*dx*dx + rx*rx*dy*dy;
+      double mu = rx*ry/Math.sqrt(dd);
+      Point res = new Point((int)(mu*dx+_x+rx),(int)(mu*dy+_y+ry));
+      //System.out.println("connectionPoint(p) returns "+res.x+','+res.y+')');
+      return res;
+    }
 } /* end class FigCircle */
 
 

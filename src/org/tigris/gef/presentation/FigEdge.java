@@ -213,8 +213,25 @@ implements PropertyChangeListener, Highlightable {
 	// needs-more-work: Find the closest Fig to this point
 	return null;
   }  
+
+  /** Return the fig of a given path item. */
+  public Fig getPathItemFig(PathItem pathItem) {
+    Fig fig = pathItem.getFig();
+    return fig;
+  }
+
+  /** Return all figs of the path items */
+  public Vector getPathItemFigs() {
+    Vector figs=new Vector();
+    for (int i=0; i< _pathItems.size(); i++) {
+      figs.add( getPathItemFig( (PathItem) _pathItems.elementAt(i)) );
+    }
+    return figs;
+  }
+
   /** Return the vector of path items on this FigEdge. */
   public Vector getPathItemsRaw() { return _pathItems; }  
+
   public int getPerimeterLength() { return _fig.getPerimeterLength(); }  
   public Point[] getPoints() { return _fig.getPoints(); }  
   public Point getPoints(int i) { return _fig.getPoints(i); }  
@@ -421,30 +438,33 @@ public String getPrivateData() {
 	calcBounds();
   }  
 public void setPrivateData(String data) {
-	StringTokenizer tokenizer = new StringTokenizer(data,"=\"' ");
+
+    // this method did nothing, so I commented out this Exception throwing code. Toby
+
+// 	StringTokenizer tokenizer = new StringTokenizer(data,"=\"' ");
 	
-	while (tokenizer.hasMoreTokens()) {
-		String tok = tokenizer.nextToken();
-		if (tok.equals("sourcePortFig")) {
-			String s = tokenizer.nextToken();
-			int value = Integer.parseInt( s );
-		}
-		else if (tok.equals("destPortFig")) {
-			String s = tokenizer.nextToken();
-			int value = Integer.parseInt( s );
-		}
-		else if (tok.equals("sourceFigNode")) {
-			String s = tokenizer.nextToken();
-			int value = Integer.parseInt( s );
-		}
-		else if (tok.equals("destFigNode")) {
-			String s = tokenizer.nextToken();
-			int value = Integer.parseInt( s );
-		}
-		else {
-			/* Unknown value */
-		}
-	}
+// 	while (tokenizer.hasMoreTokens()) {
+// 		String tok = tokenizer.nextToken();
+// 		if (tok.equals("sourcePortFig")) {
+// 			String s = tokenizer.nextToken();
+// 			int value = Integer.parseInt( s );
+// 		}
+// 		else if (tok.equals("destPortFig")) {
+// 			String s = tokenizer.nextToken();
+// 			int value = Integer.parseInt( s );
+// 		}
+// 		else if (tok.equals("sourceFigNode")) {
+// 			String s = tokenizer.nextToken();
+// 			int value = Integer.parseInt( s );
+// 		}
+// 		else if (tok.equals("destFigNode")) {
+// 			String s = tokenizer.nextToken();
+// 			int value = Integer.parseInt( s );
+// 		}
+// 		else {
+// 			/* Unknown value */
+// 		}
+// 	}
 }
   /** Set the ArrowHead at the start of this FigEdge. */
   public void setSourceArrowHead(ArrowHead newArrow) {

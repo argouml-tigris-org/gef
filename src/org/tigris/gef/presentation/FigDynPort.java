@@ -23,55 +23,113 @@
 
 
 
-package org.tigris.gef.xml;
 
-import org.xml.sax.*;
 
-/**
- * @author Piotr Kaminski
- */
 
-public class DTDEntityResolver implements EntityResolver {
+
+
+
+// File: FigDynPort.java
+
+// Classes: FigDynPort
+
+// Original Author: ics125 spring 1996
+
+// $Id$
+
+
+
+package org.tigris.gef.presentation;
+
+
+
+import java.util.*;
+import java.util.Enumeration;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+import java.beans.*;
+import javax.swing.*;
+
+
+
+/** Primitive Fig to paint spezial rectangles for SequenceDiagrams on a LayerDiagram. */
+
+
+
+public class FigDynPort extends FigRect implements Serializable {
+
+
 
   ////////////////////////////////////////////////////////////////
-  // constants
 
-  public static String DTD_DIR = "/org/tigris/gef/xml/dtd/";
-  public static final DTDEntityResolver SINGLETON = new DTDEntityResolver();
+  // instance variables
+
+
+
+  public int _pos; 
+
+
+
+  public int _dynVectorPos;
+
+
 
   ////////////////////////////////////////////////////////////////
-  // constructor
 
-  protected DTDEntityResolver() { super(); }
+  // constructors
 
-  ////////////////////////////////////////////////////////////////
-  // methods
 
-  public InputSource resolveEntity(String publicId, String systemId)
-       throws java.io.IOException, SAXException {
-    try {
-      java.net.URL url = new java.net.URL(systemId);
-      try {
-	InputSource source = new InputSource(url.openStream());
-	if (publicId != null) source.setPublicId(publicId);
-	return source;
-      }
-      catch (java.io.IOException e) {
-	// failed to get from normal system ID, try to get from
-	// our own DTD directory
-	if (systemId.endsWith(".dtd")) {
-	  int i = systemId.lastIndexOf('/');
-	  i++;	// go past '/' if there, otherwise advance to 0
-	  java.io.InputStream is;
-	  is = getClass().getResourceAsStream(DTD_DIR + systemId.substring(i));
-	  if (is != null) return new InputSource(is);
-	}
-	// if we failed to get an alternative, rethrow the original exception
-	throw e;
-      }
-    } // outer try
-    catch (java.net.MalformedURLException e2) { }
-    return null;
+
+  /** Construct a new FigDynPort w/ the given position and size. */
+
+  public FigDynPort(int x, int y, int w, int h, int pos){
+
+    super(x, y, w, h);
+
+    setPosition(pos);
+
   }
 
-} /* end class DTDEntityResolver */
+
+
+  /** Construct a new FigDynPort w/ the given position, size, line color,
+
+   *  and fill color. */
+
+  public FigDynPort(int x, int y, int w, int h, Color lColor, Color fColor, int pos) {
+
+    super(x, y, w, h, lColor, fColor);
+
+    setPosition(pos);
+
+  }
+
+
+
+  ////////////////////////////////////////////////////////////////
+
+  // acessors
+
+  
+
+  public int getPosition() { return _pos; }
+
+
+
+  public void setPosition(int newPos) { _pos = newPos; }
+
+     
+
+  public int getDynVectorPos() { return _dynVectorPos; }
+
+
+
+  public void setDynVectorPos(int newVectorPos) { _dynVectorPos = newVectorPos; }
+
+ 
+
+} /* end class FigDynPort */
+
+
+

@@ -35,11 +35,13 @@ import java.util.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.Serializable;
+import javax.swing.*;
 import javax.swing.event.EventListenerList;
 
 import org.tigris.gef.presentation.*;
 import org.tigris.gef.event.*;
 import org.tigris.gef.util.*;
+import org.tigris.gef.util.logging.LogManager;
 
 /** This class handles Manager selections. It is basically a
  *  collection of Selection instances. Most of its operations
@@ -291,6 +293,44 @@ implements Serializable, KeyListener, MouseListener, MouseMotionListener {
     return r;
   }
 
+  /**
+   * This method will return the upper-left coordinate point
+   * of the entire selection by iterating through the figs
+   *
+   * @return Point - the point for that upper left corner
+   *
+   */
+  public Point getLocation() {
+
+     int size = _selections.size();
+
+     if (size < 1) return new Point(0,0);
+
+     Selection sel = null;
+
+     // I just set these to two unbelievably big numbers
+
+     int lowestX = 32000;
+     int lowestY = 32000;
+
+     Point pt = null;
+
+     for (int i = 0; i < size; i++) {
+      sel = (Selection) _selections.elementAt(i);
+      pt = sel.getLocation();
+      if (pt.getX() < lowestX)
+        { lowestX = (int) pt.getX(); }
+      if (pt.getY() < lowestY)
+        { lowestY = (int) pt.getY(); }
+    }
+
+    pt = null;
+    sel = null;
+
+    return new Point(lowestX,lowestY);
+  }
+
+
 //   /** Align the selected Fig's relative to each other */
 //   /* needs-more-work: more of this logic should be in ActionAlign */
 //   public void align(int dir) {
@@ -445,9 +485,20 @@ implements Serializable, KeyListener, MouseListener, MouseMotionListener {
   public void keyReleased(KeyEvent ke) { }
 
   public void keyPressed(KeyEvent ke) {
-    Enumeration sels = ((Vector)_selections.clone()).elements();
-    while (sels.hasMoreElements() && !ke.isConsumed())
-      ((Selection) sels.nextElement()).keyPressed(ke);
+	  int keyCode = ke.getKeyCode();
+// 	  if (keyCode == KeyEvent.VK_DELETE) {
+// 		  String confirmStr = Localizer.localize("GefBase","SureRemoveElement") + "?\n";
+// 		  //needs-more-work: find a component being parent to the confirm dialog
+// 		  int response = JOptionPane.showConfirmDialog(new JFrame(), confirmStr, 
+// 													   Localizer.localize("GefBase","AskSure") + "?", 
+// 													   JOptionPane.YES_NO_OPTION);
+// 		  if (response == JOptionPane.YES_OPTION)
+// 			  delete();
+// 		  return;
+// 	  }
+	  Enumeration sels = ((Vector)_selections.clone()).elements();
+	  while (sels.hasMoreElements() && !ke.isConsumed())
+		  ((Selection) sels.nextElement()).keyPressed(ke);
   }
 
   public void mouseMoved(MouseEvent me) {

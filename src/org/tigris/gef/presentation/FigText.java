@@ -38,6 +38,7 @@ import javax.swing.*;
 import javax.swing.event.*;
 
 import org.tigris.gef.properties.*;
+import org.tigris.gef.util.logging.LogManager;
 
 /** This class handles painting and editing text Fig's in a
  *  LayerDiagram. Needs-More-Work: should eventually allow styled text
@@ -79,6 +80,8 @@ public class FigText extends Fig implements KeyListener, MouseListener {
   /** True if the text should be editable. False for read-only. */
   protected boolean _editable = true;
 
+  protected Class _textEditorClass = FigTextEditor.class;
+  
   /** True if the text should be underlined. needs-more-work. */
   protected boolean _underline = false;
 
@@ -99,6 +102,8 @@ public class FigText extends Fig implements KeyListener, MouseListener {
 
   /** True if the FigText can only grow in size, never shrink. */
   protected boolean _expandOnly = false;
+
+	protected boolean _editMode = false;
 
   /** Text justification can be JUSTIFY_LEFT, JUSTIFY_RIGHT, or JUSTIFY_CENTER. */
   protected int _justification = JUSTIFY_LEFT;
@@ -134,20 +139,31 @@ public class FigText extends Fig implements KeyListener, MouseListener {
    *  string, font, and font size. Text string is initially empty and
    *  centered. */
   public FigText(int x, int y, int w, int h,
-		 Color textColor, String familyName, int fontSize) {
+		 Color textColor, String familyName, int fontSize,
+		 boolean expandOnly) {
     super(x, y, w, h);
     _x = x; _y = y; _w = w; _h = h;
     _textColor = textColor;
     _font = new Font(familyName, Font.PLAIN, fontSize);
     _justification = JUSTIFY_CENTER;
     _curText = "";
+    _expandOnly = expandOnly;
+  }
+
+  public FigText(int x, int y, int w, int h,
+		 Color textColor, String familyName, int fontSize) {
+    this(x, y, w, h, textColor, familyName, fontSize, false);
+  }
+
+  /** Construct a new FigText with the given position and size */
+  public FigText(int x, int y, int w, int h ) {
+    this(x, y, w, h, Color.blue, "TimesRoman", 10, false);
   }
 
   /** Construct a new FigText with the given position, size, and attributes. */
-  public FigText(int x, int y, int w, int h ) {
-    this(x, y, w, h, Color.blue, "TimesRoman", 10);
+  public FigText(int x, int y, int w, int h , boolean expandOnly) {
+    this(x, y, w, h, Color.blue, "TimesRoman", 10, expandOnly);
   }
-
   ////////////////////////////////////////////////////////////////
   // invariant
 
@@ -171,7 +187,7 @@ public class FigText extends Fig implements KeyListener, MouseListener {
     if (_justification == JUSTIFY_LEFT) return "Left";
     else if (_justification == JUSTIFY_CENTER) return "Center";
     else if (_justification == JUSTIFY_RIGHT) return "Right";
-    System.out.println("internal error, unknown text alignment");
+    LogManager.log.error("internal error, unknown text alignment");
     return "Unknown";
   }
 
@@ -328,17 +344,46 @@ public class FigText extends Fig implements KeyListener, MouseListener {
   public void append(String s) { setText(_curText + s); }
 
   /** set the current String to be the given String. */
-  public void setText(String s) { _curText = s; calcBounds(); }
+  public void setText(String s) {
+	  _curText = s;
+	  calcBounds();
+	  _editMode = false;
+  }
 
   /** Get the String held by this FigText. Multi-line text is
    *  represented by newline characters embedded in the String. */
   public String getText() { return _curText; }
 
+  public Class getTextEditorClass() {
+      return _textEditorClass;
+  }
+
+  public void setTextEditorClass(Class editorClass) {
+      _textEditorClass = editorClass;
+  }
+
+  /**
+   *  Overrides method of class Fig
+   *  Implements linewidths greater than one
+   */
+  public void setLineWidth(int w) {
+    //int newLW = Math.max(0, Math.min(1, w));
+    firePropChange("lineWidth", _lineWidth, w);
+    _lineWidth = w;
+  }
+
   ////////////////////////////////////////////////////////////////
   // painting methods
 
-  /** Paint the FigText. */
+  /** Paint the FigText.
+   *  Distingusih between linewidth=1 and >1
+   *  If <linewidth> is equal 1, then paint a single rectangle
+   *  Otherwise paint <linewidth> nested rectangles, whereas
+   *  every rectangle is painted of 4 connecting lines.
+   */
+
   public void paint(Graphics g) {
+    if (!(_displayed)) return;
     int chunkX = _x + _leftMargin;
     int chunkY = _y + _topMargin;
     StringTokenizer lines;
@@ -349,7 +394,20 @@ public class FigText extends Fig implements KeyListener, MouseListener {
     }
     if (_lineWidth > 0) {
       g.setColor(_lineColor);
-      g.drawRect(_x, _y, _w - _lineWidth, _h - _lineWidth);
+      // test linewidth
+      if (_lineWidth==1) {
+        // paint single rectangle
+        g.drawRect(_x, _y, _w - _lineWidth, _h - _lineWidth);
+      } else {
+        // paint <linewidth rectangles
+        for (int i=0;i<_lineWidth;i++) {
+          // a rectangle is painted as four connecting lines
+          g.drawLine(_x+i,_y+i,_x+_w-i,_y+i);
+          g.drawLine(_x+_w-i,_y+i,_x+_w-i,_y+_h-i);
+          g.drawLine(_x+_w-i,_y+_h-i,_x+i,_y+_h-i);
+          g.drawLine(_x+i,_y+_h-i,_x+i,_y+i);
+        }
+      }
     }
     if (_font != null) g.setFont(_font);
     _fm = g.getFontMetrics(_font);
@@ -478,6 +536,7 @@ public class FigText extends Fig implements KeyListener, MouseListener {
     case KeyEvent.VK_HELP:
     case KeyEvent.VK_PAUSE:
     case KeyEvent.VK_DELETE:
+    case KeyEvent.VK_ESCAPE:
       return true;
     }
     if (ke.isControlDown()) return true;
@@ -504,10 +563,24 @@ public class FigText extends Fig implements KeyListener, MouseListener {
   public void mouseEntered(MouseEvent me) { }
   
   public void mouseExited(MouseEvent me) { }
-  
+
   public FigTextEditor startTextEditor(InputEvent ie) {
-    FigTextEditor te = new FigTextEditor(this, ie);
-    return te;
+      LogManager.log.debug("[FigText] startTextEditor");
+      FigTextEditor te;
+      try {
+          Object editor = _textEditorClass.newInstance();
+          if (!(editor instanceof FigTextEditor))
+              te = new FigTextEditor();
+          else
+              te = (FigTextEditor)editor;
+      }
+      catch(Exception e) {
+          te = new FigTextEditor();
+      }
+      te.init(this,ie);
+      LogManager.log.debug("[FigText] TextEditor started");
+      _editMode = true;
+      return te;
   }
 
 
@@ -519,6 +592,7 @@ public class FigText extends Fig implements KeyListener, MouseListener {
    *  now text objects can get larger when you type more, but they
    *  do not get smaller when you backspace.  */
   public void calcBounds() {
+    Rectangle bounds = getBounds();
     if (_font == null) return;
     if (_fm == null) _fm = Toolkit.getDefaultToolkit().getFontMetrics(_font);
     int overallW = 0;
@@ -535,22 +609,25 @@ public class FigText extends Fig implements KeyListener, MouseListener {
     int overallH = (_lineHeight + _lineSpacing) * numLines +
       _topMargin + _botMargin + maxDescent;
     overallW = Math.max(MIN_TEXT_WIDTH, overallW + _leftMargin + _rightMargin);
-    switch (_justification) {
-      case JUSTIFY_LEFT: 
-        break;
-      
-      case JUSTIFY_CENTER:
-        if (_w < overallW) 
-          _x -= (overallW - _w) / 2;
-        break;
-    
-      case JUSTIFY_RIGHT: 
-        if (_w < overallW) 
-          _x -= (overallW - _w); 
-        break;
-    }
+	if (_editMode) {
+		switch (_justification) {
+		case JUSTIFY_LEFT:
+			break;
+			
+		case JUSTIFY_CENTER:
+			if (_w < overallW)
+				_x -= (overallW - _w) / 2;
+			break;
+
+		case JUSTIFY_RIGHT:
+			if (_w < overallW)
+				_x -= (overallW - _w);
+			break;
+		}
+	}
     _w = _expandOnly ? Math.max(_w, overallW) : overallW;
     _h = _expandOnly ? Math.max(_h, overallH) : overallH;
   }
+
 } /* end class FigText */
 

@@ -21,7 +21,6 @@
 // CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT,
 // UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
-
 // File: ModeDragScroll.java
 // Classes: ModeDragScroll
 // Original Author: Sean Chen, schen@webex.net
@@ -41,7 +40,7 @@ import javax.swing.*;
  * @see Editor
  * @author Sean Chen, schen@webex.net
  */
-public class ModeDragScroll extends Mode implements ActionListener {
+public class ModeDragScroll extends FigModifyingModeImpl implements ActionListener {
 
   /** Pause time between each scroll during autoscroll (in milliseconds)
    */
@@ -104,7 +103,7 @@ public class ModeDragScroll extends Mode implements ActionListener {
     dragScrolling = (me.isAltDown());
 
     // get the component and the view
-    component = (JComponent) _editor.getAwtComponent();
+    component = (JComponent) editor.getAwtComponent();
     if (component == null) return;
     if (component != null && component.getParent() instanceof JViewport)
       view = (JViewport) component.getParent();
@@ -137,6 +136,7 @@ public class ModeDragScroll extends Mode implements ActionListener {
    * @param me 
    */
   public void mouseDragged(MouseEvent me) {
+    me = editor.retranslateMouseEvent(me);
     int x = me.getX(), y = me.getY();
     recentX = x; recentY = y;
     // are we out of this component? if so, don't do anything
@@ -239,7 +239,7 @@ public class ModeDragScroll extends Mode implements ActionListener {
     }
     //view.scrollRectToVisible(newView);
     view.setViewPosition(new Point(currentView.x, currentView.y));
-    //System.out.println("scrolled to "+newView+" / "+_editor.getCurrentView());
+    //System.out.println("scrolled to "+newView+" / "+editor.getCurrentView());
     xcorrection += newView.x;
     ycorrection += newView.y;
     currentView = view.getViewRect();  //jer

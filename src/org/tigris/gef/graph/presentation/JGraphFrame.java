@@ -35,6 +35,7 @@ import org.tigris.gef.base.*;
 import org.tigris.gef.ui.*;
 import org.tigris.gef.event.*;
 import org.tigris.gef.graph.*;
+import org.tigris.gef.util.*;
 
 /** A window that displays a toolbar, a connected graph editing pane,
  *  and a status bar. */
@@ -120,35 +121,44 @@ implements IStatusBar, Cloneable, ModeChangeListener {
 	//System.out.println("TabDiagram got mode change event");
 	if (!Globals.getSticky() && Globals.mode() instanceof ModeSelect)
 	  _toolbar.unpressAllButtons();
-  }  
-  public void setGraph(JGraph g) { _graph = g; }  
+  }
+  public void setGraph(JGraph g) { _graph = g; }
   public void setGraphEdgeRenderer(GraphEdgeRenderer rend) {
 	_graph.getEditor().setGraphEdgeRenderer(rend);
-  }  
-  public void setGraphModel(GraphModel gm) { _graph.setGraphModel(gm); }  
+  }
+  public void setGraphModel(GraphModel gm) { _graph.setGraphModel(gm); }
   public void setGraphNodeRenderer(GraphNodeRenderer rend) {
 	_graph.getEditor().setGraphNodeRenderer(rend);
-  }  
+  }
   public void setJMenuBar(JMenuBar mb) {
 	_menubar = mb;
 	getContentPane().add(_menubar, BorderLayout.NORTH);
-  }  
+  }
   public void setToolBar(ToolBar tb) {
 	_toolbar = tb;
-	_mainPanel.add(_toolbar, BorderLayout.NORTH);    
-  }  
+	_mainPanel.add(_toolbar, BorderLayout.NORTH);
+  }
   /** Set up the menus and keystrokes for menu items. Subclasses can
    *  override this, or you can use setMenuBar(). */
   protected void setUpMenus() {
-	JMenuItem openItem, openPGMLItem, openSVGItem, saveItem, savePGMLItem, saveSVGItem, printItem, prefsItem, exitItem;
+	JMenuItem openItem,
+                  openPGMLItem,
+                  openSVGItem,
+                  saveItem,
+                  savePGMLItem,
+                  saveSVGItem,
+                  printItem,
+                  printPageSetupItem,
+                  prefsItem,
+                  exitItem;
 	JMenuItem selectAllItem;
 	JMenuItem deleteItem, cutItem, copyItem, pasteItem;
 	JMenuItem editNodeItem;
 	JMenuItem groupItem, ungroupItem;
 	JMenuItem toBackItem, backwardItem, toFrontItem, forwardItem;
 	JMenuItem nudgeUpItem, nudgeDownItem, nudgeLeftItem, nudgeRightItem;
-	
-	JMenu file = new JMenu("File");
+
+	JMenu file = new JMenu(Localizer.localize("GefBase","File"));
 	file.setMnemonic('F');
 	_menubar.add(file);
 	//file.add(new CmdNew());
@@ -158,18 +168,20 @@ implements IStatusBar, Cloneable, ModeChangeListener {
 	saveItem = file.add(new CmdSave());
 	savePGMLItem = file.add(new CmdSavePGML());
 	saveSVGItem = file.add(new CmdSaveSVG());
-	printItem = file.add(new CmdPrint());
+    CmdPrint cmdPrint = new CmdPrint();
+	printItem = file.add(cmdPrint);
+	printPageSetupItem = file.add(new CmdPrintPageSetup(cmdPrint));
 	prefsItem = file.add(new CmdOpenWindow("org.tigris.gef.base.PrefsEditor",
 					   "Preferences..."));
 	//file.add(new CmdClose());
 	exitItem = file.add(new CmdExit());
 
-	
-	JMenu edit = new JMenu("Edit");
+
+	JMenu edit = new JMenu(Localizer.localize("GefBase","Edit"));
 	edit.setMnemonic('E');
 	_menubar.add(edit);
-	
-	JMenu select = new JMenu("Select");
+
+	JMenu select = new JMenu(Localizer.localize("GefBase","Select"));
 	edit.add(select);
 	selectAllItem = select.add(new CmdSelectAll());
 	select.add(new CmdSelectNext(false));
@@ -194,7 +206,7 @@ implements IStatusBar, Cloneable, ModeChangeListener {
 	edit.add(new CmdUseResize());
 	edit.add(new CmdUseRotate());
 
-	JMenu view = new JMenu("View");
+	JMenu view = new JMenu(Localizer.localize("GefBase","View"));
 	_menubar.add(view);
 	view.setMnemonic('V');
 	view.add(new CmdSpawn());
@@ -208,7 +220,7 @@ implements IStatusBar, Cloneable, ModeChangeListener {
 	view.add(new CmdAdjustGuide());
 	view.add(new CmdAdjustPageBreaks());
 
-	JMenu arrange = new JMenu("Arrange");
+	JMenu arrange = new JMenu(Localizer.localize("GefBase","Arrange"));
 	_menubar.add(arrange);
 	arrange.setMnemonic('A');
 	groupItem = arrange.add(new CmdGroup());
@@ -216,7 +228,7 @@ implements IStatusBar, Cloneable, ModeChangeListener {
 	ungroupItem = arrange.add(new CmdUngroup());
 	ungroupItem.setMnemonic('U');
 
-	JMenu align = new JMenu("Align");
+	JMenu align = new JMenu(Localizer.localize("GefBase","Align"));
 	arrange.add(align);
 	align.add(new CmdAlign(CmdAlign.ALIGN_TOPS));
 	align.add(new CmdAlign(CmdAlign.ALIGN_BOTTOMS));
@@ -226,21 +238,21 @@ implements IStatusBar, Cloneable, ModeChangeListener {
 	align.add(new CmdAlign(CmdAlign.ALIGN_V_CENTERS));
 	align.add(new CmdAlign(CmdAlign.ALIGN_TO_GRID));
 
-	JMenu distribute = new JMenu("Distribute");
+	JMenu distribute = new JMenu(Localizer.localize("GefBase","Distribute"));
 	arrange.add(distribute);
 	distribute.add(new CmdDistribute(CmdDistribute.H_SPACING));
 	distribute.add(new CmdDistribute(CmdDistribute.H_CENTERS));
 	distribute.add(new CmdDistribute(CmdDistribute.V_SPACING));
 	distribute.add(new CmdDistribute(CmdDistribute.V_CENTERS));
 
-	JMenu reorder = new JMenu("Reorder");
+	JMenu reorder = new JMenu(Localizer.localize("GefBase","Reorder"));
 	arrange.add(reorder);
 	toBackItem = reorder.add(new CmdReorder(CmdReorder.SEND_TO_BACK));
 	toFrontItem = reorder.add(new CmdReorder(CmdReorder.BRING_TO_FRONT));
 	backwardItem = reorder.add(new CmdReorder(CmdReorder.SEND_BACKWARD));
 	forwardItem = reorder.add(new CmdReorder(CmdReorder.BRING_FORWARD));
 
-	JMenu nudge = new JMenu("Nudge");
+	JMenu nudge = new JMenu(Localizer.localize("GefBase","Nudge"));
 	arrange.add(nudge);
 	nudgeLeftItem = nudge.add(new CmdNudge(CmdNudge.LEFT));
 	nudgeRightItem = nudge.add(new CmdNudge(CmdNudge.RIGHT));

@@ -21,9 +21,6 @@
 // CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT,
 // UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
-
-
-
 // File: CmdAdjustPageBreaks.java
 // Classes: CmdAdjustPageBreaks
 // Original Author: jrobbins@ics.uci.edu
@@ -42,7 +39,7 @@ public class CmdAdjustPageBreaks extends Cmd {
 
   /** Construct a new CmdAdjustPageBreaks */
   public CmdAdjustPageBreaks() {
-    super("Adjust PageBreaks", NO_ICON);
+    super("AdjustPageBreaks");
   }
 
   public void doIt() {

@@ -21,9 +21,6 @@
 // CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT,
 // UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
-
-
-
 // File: CmdAdjustGuide.java
 // Classes: CmdAdjustGuide
 // Original Author: jrobbins@ics.uci.edu
@@ -40,7 +37,9 @@ import java.awt.Event;
 
 public class CmdAdjustGuide extends Cmd {
 
-  public CmdAdjustGuide() { super("Adjust Grid Snap", NO_ICON); }
+  public CmdAdjustGuide() {
+	  super("AdjustGridSnap");
+  }
 
   public void doIt() {
     Editor ce = Globals.curEditor();

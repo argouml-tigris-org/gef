@@ -21,8 +21,6 @@
 // CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT,
 // UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
-
-
 // File: ModePlace.java
 // Classes: ModePlace
 // Original Author: jrobbins@ics.uci.edu
@@ -44,7 +42,7 @@ import org.tigris.gef.presentation.*;
  * @see FigNode
  */
 
-public class ModePlace extends Mode {
+public class ModePlace extends FigModifyingModeImpl {
 
   ////////////////////////////////////////////////////////////////
   // instance variables
@@ -61,6 +59,8 @@ public class ModePlace extends Mode {
 
   protected boolean _addRelatedEdges = false;
 
+  protected String _instructions; 
+
   ////////////////////////////////////////////////////////////////
   // constructor
 
@@ -69,7 +69,15 @@ public class ModePlace extends Mode {
     _factory = gf;
     _node = null;
     _pers = null;
+    _instructions = null;
   }
+
+    public ModePlace(GraphFactory gf,String instructions) {
+	_factory = gf;
+	_node = null;
+	_pers = null;
+	_instructions = instructions;
+    } 
 
   ////////////////////////////////////////////////////////////////
   // user feedback
@@ -77,9 +85,9 @@ public class ModePlace extends Mode {
   /** A string to be shown in the status bar of the Editor when this
    * mode is on top of the ModeManager. */
   public String instructions() {
-    if (_node != null) return "Click to place " + _node.toString();
-    //if (_factory != null) return "Click to place " + _factory.toString();
-    return "";
+    if(_instructions == null)
+	_instructions = "";
+    return _instructions;  
   }
 
   /** By default all creation modes use CROSSHAIR_CURSOR. */
@@ -99,10 +107,10 @@ public class ModePlace extends Mode {
     if (me.isConsumed()) return;
     _node = _factory.makeNode();
     start();
-    _editor = Globals.curEditor();
-    GraphModel gm = _editor.getGraphModel();
-    GraphNodeRenderer renderer = _editor.getGraphNodeRenderer();
-    Layer lay = _editor.getLayerManager().getActiveLayer();
+    editor = Globals.curEditor();
+    GraphModel gm = editor.getGraphModel();
+    GraphNodeRenderer renderer = editor.getGraphNodeRenderer();
+    Layer lay = editor.getLayerManager().getActiveLayer();
     _pers = renderer.getFigNodeFor(gm, lay, _node);
     mouseMoved(me); // move _pers into position
     me.consume();
@@ -110,7 +118,7 @@ public class ModePlace extends Mode {
 
   /** Move the perpective along with the mouse. */
   public void mouseExited(MouseEvent me) {
-    _editor.damaged(_pers);
+    editor.damaged(_pers);
     _pers = null;
     me.consume();
   }
@@ -120,11 +128,11 @@ public class ModePlace extends Mode {
     if (me.isConsumed()) return;
     int x = me.getX(), y = me.getY();
     if (_pers == null) { me.consume(); return; }
-    _editor.damaged(_pers);
+    editor.damaged(_pers);
     Point snapPt = new Point(x, y);
-    _editor.snap(snapPt);
+    editor.snap(snapPt);
     _pers.setLocation(snapPt.x, snapPt.y);
-    _editor.damaged(_pers); /* needed? */
+    editor.damaged(_pers); /* needed? */
     me.consume();
   }
 
@@ -144,19 +152,19 @@ public class ModePlace extends Mode {
    * @see org.tigris.gef.graph.GraphNodeHooks#postPlacement */
   public void mouseReleased(MouseEvent me) {
     if (me.isConsumed()) return;
-    GraphModel gm = _editor.getGraphModel();
+    GraphModel gm = editor.getGraphModel();
     if (!(gm instanceof MutableGraphModel)) return;
 
     MutableGraphModel mgm = (MutableGraphModel) gm;
     if (mgm.canAddNode(_node)) {
-      _editor.add(_pers);
+      editor.add(_pers);
       mgm.addNode(_node);
       if(_addRelatedEdges)                 
         mgm.addNodeRelatedEdges(_node);
 
       Fig encloser = null;
       Rectangle bbox = _pers.getBounds();
-      Layer lay = _editor.getLayerManager().getActiveLayer();
+      Layer lay = editor.getLayerManager().getActiveLayer();
       Vector otherFigs = lay.getContents();
       Enumeration others = otherFigs.elements();
       while (others.hasMoreElements()) {
@@ -170,13 +178,22 @@ public class ModePlace extends Mode {
       }
       _pers.setEnclosingFig(encloser);
       if (_node instanceof GraphNodeHooks)
-	((GraphNodeHooks)_node).postPlacement(_editor);
-      _editor.getSelectionManager().select(_pers);
+	((GraphNodeHooks)_node).postPlacement(editor);
+      editor.getSelectionManager().select(_pers);
     }
     done();
     me.consume();
   }
 
+    public void keyPressed(KeyEvent ke) { 
+        if (ke.getKeyCode() == KeyEvent.VK_ESCAPE) {
+            Globals.setSticky(false);
+            done();
+            Globals.nextMode();
+            Globals.curEditor().finishMode();
+        }
+    }
+    
   public void done() {
     super.done();
     _pers = null;

@@ -21,8 +21,6 @@
 // CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT,
 // UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
-
-
 package org.tigris.gef.util;
 
 import java.io.File;
@@ -70,42 +68,32 @@ public class Util {
     if (!url.getFile().endsWith(desiredExtension)) {
       try { url = new URL(url, url.getFile() + desiredExtension); }
       catch (java.net.MalformedURLException e) {
-	throw new UnexpectedException(e);
+ throw new UnexpectedException(e);
       }
     }
     return url;
   }
 
-  public static ImageIcon loadIconResource(String imgName) {
-    return loadIconResource(imgName, imgName);
-  }
-
-  public static ImageIcon loadIconResource(String imgName, String desc) {
-    ImageIcon res = null;
-    try {
-		java.net.URL imgURL = Util.class.getResource(imageName(imgName,true));
-		if (imgURL == null)
-			imgURL = Util.class.getResource(imageName(imgName,false));
-
-		if (imgURL == null) {
-			System.out.println("Icon for " + imgName + " not found");
-			return null;
+	public static final URL exchangeURLExtension(URL url, String desiredExtension, String oldExtension) {
+		if (!url.getFile().endsWith(oldExtension)) {
+			//System.out.println("[GEF.Util] exchangeURLExtension: no exchange " + url.getFile());
+			return Util.fixURLExtension(url, desiredExtension);
 		}
-		return new ImageIcon(imgURL, desc + " ");
-    }
-    catch (Exception ex) {
-		System.out.println("Exception in loadIconResource");
-		ex.printStackTrace();
-		return new ImageIcon(desc);
-    }
-  }
-
-  protected static String imageName(String name, boolean defaultLocation) {
-	  String imageLocation = "/org/tigris/gef/Images";
-	  if ( !defaultLocation )
-		  imageLocation = System.getProperty("gef.imageLocation","/org/tigris/gef/Images");
-	  return imageLocation + "/" + stripJunk(name) + ".gif";
-  }
+		else {
+			try {
+				//System.out.println("[GEF.Util] exchangeURLExtension: exchange");
+				String newURL = url.getFile();
+				newURL = newURL.substring(0,newURL.lastIndexOf('.'));
+				//System.out.println("[GEF.Util] exchangeURLExtension: new url = " + newURL);
+				url = new URL(url, newURL);
+				//System.out.println("[GEF.Util] exchangeURLExtension: exchanged " + url.getFile());
+			}
+			catch (java.net.MalformedURLException mue) {
+				throw new UnexpectedException(mue);
+			}
+		}
+		return url;
+	}
 
   /*
    * Strip all characters out of <var>s</var> that could not be part of a valid

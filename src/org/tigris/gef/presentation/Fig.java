@@ -105,6 +105,13 @@ implements Cloneable, java.io.Serializable, PropertyChangeListener, PopupGenerat
 
   protected Fig _group = null;
 
+    protected String _context = "";
+    /** True if the Fig is shown. This funct once was in FogComponent of ArgoUML */
+
+  protected boolean _displayed = true;
+
+  public int _shown = 0;
+
   ////////////////////////////////////////////////////////////////
   // static initializer
 
@@ -132,27 +139,104 @@ implements Cloneable, java.io.Serializable, PropertyChangeListener, PopupGenerat
   /** Most subclasses will not use this constructor, it is only useful
    *  for subclasses that redefine most of the infrastructure provided
    *  by class Fig. */
-  public Fig() { }  
+  public Fig() { an = new NoAnnotationStrategy(); }  
   /** Construct a new Fig with the given bounds. */
   public Fig(int x, int y, int w, int h) {
 	this(x, y, w, h, Color.black, Color.white, null);
-  }  
+  }
   /** Construct a new Fig with the given bounds and colors. */
   public Fig(int x, int y, int w, int h, Color lineColor, Color fillColor) {
 	this(x, y, w, h, lineColor, fillColor, null);
-  }  
+  }
   ////////////////////////////////////////////////////////////////
   // constuctors
 
   /** Construct a new Fig with the given bounds, colors, and owner. */
   public Fig(int x, int y, int w, int h,
 		 Color lineColor, Color fillColor, Object own) {
+	this();
 	_x = x; _y = y; _w = w; _h = h;
 	if (lineColor != null) _lineColor = lineColor; else _lineWidth = 0;
 	if (fillColor != null) _fillColor = fillColor; else _filled = false;
 	setOwner(own);
-  }  
-  public void addPoint(int x, int y) { }  
+	//annotation related
+  }
+
+  //--------------------------------
+  // annotation related
+
+  protected AnnotationStrategy an = new NoAnnotationStrategy();
+  protected boolean annotationStatus = false;
+  protected Fig annotationOwner;
+
+  // specifies the AnnotationOwner
+  public void setAnnotationOwner(Fig f){
+	annotationOwner = f;
+	setAnnotationStatus(true);
+  }
+
+  // fig is not an annotation any longer
+  public void unsetAnnotationOwner() {
+        annotationOwner = null;
+        setAnnotationStatus(false);
+  }
+
+  public Fig getAnnotationOwner(){
+	return annotationOwner;
+  }
+
+  public AnnotationStrategy getAnnotationStrategy(){
+	return an;
+  }
+
+  //** Set the AnnotationStrategy for this fig */
+  //** using this method will discard the previous AnnotationStrategy */
+  public void setAnnotationStrategy(AnnotationStrategy a){
+        an = a;
+  }
+
+  // returns true if this fig is an annotation of any other fig
+  public boolean isAnnotation(){
+  	return annotationStatus;
+  }
+
+  public void setAnnotationStatus(boolean newValue) {
+        //System.out.println("[Fig] setAnnotationStatus: " + newValue);
+        annotationStatus = newValue;
+  }
+
+    /**
+     * Adds a new Annotation of type "text" to fig.
+     */
+    public void addAnnotation(Fig annotation, String type, String context) {
+    }
+
+    public void removeAnnotation(String context) {
+    }
+
+    /**
+     * Updates the positions of the connected annotations.
+     */
+    public void updateAnnotationPositions() {
+	//System.out.println("[Fig] updateAnnotationPositions");
+	Enumeration annotations = getAnnotationStrategy().getAllAnnotations();
+	//System.out.println("[Fig] numOfAnnotations = " + getAnnotationStrategy().numOfAnnotations());
+	while (annotations.hasMoreElements()) {
+	    Fig annotation = (Fig)annotations.nextElement();
+	    Rectangle annotRect = annotation.getBounds();
+	    //System.out.println("[Fig] updateAnnotationPositions: "+annotRect.x+" "+annotRect.y+" "+annotRect.width+" "+annotRect.height);
+	    getAnnotationStrategy().storeAnnotationPosition(annotation);
+	    annotation.endTrans();
+	}
+	endTrans();
+    }
+
+    public void initAnnotations() {}
+
+  // end annotation related
+  //-----------------------------------
+
+  public void addPoint(int x, int y) { }
   ////////////////////////////////////////////////////////////////
   // updates
 
@@ -168,7 +252,7 @@ implements Cloneable, java.io.Serializable, PropertyChangeListener, PopupGenerat
    *  prevent garbage collection. */
   public void addPropertyChangeListener(PropertyChangeListener l) {
 	Globals.addPropertyChangeListener(this, l);
-  }  
+  }
   /** Align this Fig with the given rectangle. Some subclasses may
    *  need to know the editor that initiated this action.  */
   public void align(Rectangle r, int direction, Editor ed) {
@@ -333,6 +417,17 @@ implements Cloneable, java.io.Serializable, PropertyChangeListener, PopupGenerat
   /** Remove this Fig from the Layer being edited by the
    *  given editor. */
   public void delete() {
+  	_displayed = false;
+  	// annotation related
+  	// delete all annotations first
+        java.util.Enumeration enum = getAnnotationStrategy().getAllAnnotations();
+        while (enum.hasMoreElements()){
+        	Fig annotation = (Fig)enum.nextElement();
+        	getAnnotationStrategy().getAnnotationProperties(annotation).removeLine();
+                getAnnotationStrategy().removeAnnotation(annotation);
+                annotation.delete();
+        }
+        // end annotation related
 	if (_layer != null) { _layer.deleted(this); }
 	setOwner(null);
   }  
@@ -380,7 +475,7 @@ implements Cloneable, java.io.Serializable, PropertyChangeListener, PopupGenerat
 	}
 	// needs-more-work: phase not taken into account
 	return (length + phase) % dashesDist;
-  }  
+  }
   protected void drawDashedPerimeter(Graphics g) {
 	Point segStart = new Point();
 	Point segEnd = new Point();
@@ -396,54 +491,70 @@ implements Cloneable, java.io.Serializable, PropertyChangeListener, PopupGenerat
 	  i += _dashes[d];
 	  d = (d + 1) % numDashes;
 	}
-  }  
+  }
   /** This is called after an Cmd mondifies a Fig and the Fig needs to
    * be redrawn in its new position. This also unlocks the
    * RedrawManager. In general, endTrans() should be * paired with a
    * startTrans(), although it is alright to have extra calls to
    * endTrans(). */
   public void endTrans() {
+
+  	// annotation related
+  	if (this.isAnnotation()){
+	    if (!(Globals.curEditor().getSelectionManager().containsFig(this.getAnnotationOwner())) && Globals.curEditor().getSelectionManager().containsFig(this) ){
+		(getAnnotationOwner().an).storeAnnotationPosition(this);
+	    }
+        }
+		
+        if (!(getAnnotationStrategy() instanceof NoAnnotationStrategy)){
+	    getAnnotationStrategy().translateAnnotations(this);
+        }
+	
+        // end annotation related
 	damage();
 	//RedrawManager.unlock();  // helps avoid dirt
-  }  
-  protected void firePropChange(String propName, int oldV, int newV) {
+  }
+
+  public void firePropChange(String propName, int oldV, int newV) {
 	firePropChange(propName, new Integer(oldV), new Integer(newV));
-  }  
+  }
+
   /** Creates a PropertyChangeEvent and calls all registered listeners
    *  propertyChanged() method. */
-  protected void firePropChange(String propName, Object oldV, Object newV) {
+  public void firePropChange(String propName, Object oldV, Object newV) {
 	Globals.firePropChange(this, propName, oldV, newV);
 	if (_group != null) {
 	  PropertyChangeEvent pce =
 	new PropertyChangeEvent(this, propName, oldV, newV);
 	  _group.propertyChange(pce);
 	}
-  }  
-  protected void firePropChange(String propName, boolean oldV, boolean newV) {
+  }
+  public void firePropChange(String propName, boolean oldV, boolean newV) {
 	firePropChange(propName, new Boolean(oldV), new Boolean(newV));
-  }  
+  }
   /** Return a Rectangle that completely encloses this Fig. */
-  public Rectangle getBounds() { return new Rectangle(_x, _y, _w, _h); }  
+  public Rectangle getBounds() { return new Rectangle(_x, _y, _w, _h); }
   public Point getClosestPoint(Point anotherPt) {
 	return Geometry.ptClosestTo(getBounds(), anotherPt);
-  }  
+  }
   /** Get the dashed attribute **/
-  public boolean getDashed() { return (_dashes != null); }  
-  public int getDashed01() { return getDashed() ? 1 : 0; }  
+  public boolean getDashed() { return (_dashes != null); }
+  public int getDashed01() { return getDashed() ? 1 : 0; }
   public String getDashedString() {
 	return (_dashes == null) ? DASHED_CHOICES[0] : DASHED_CHOICES[1];
-  }  
-  public Vector getEnclosedFigs() { return null; }  
-  public Fig getEnclosingFig() { return null; }  
-  public Color getFillColor() { return _fillColor; }  
-  public boolean getFilled() { return _filled; }  
-  public int getFilled01() { return _filled ? 1 : 0; }  
-  public Point getFirstPoint() { return new Point(); }  
-  public Vector getGravityPoints() { return null; }  
-  public Fig getGroup() { return _group; }  
+  }
+  public Vector getEnclosedFigs() { return null; }
+  public Fig getEnclosingFig() { return null; }
+  public Color getFillColor() { return _fillColor; }
+  public boolean getFilled() { return _filled; }
+  public int getFilled01() { return _filled ? 1 : 0; }
+  public Point getFirstPoint() { return new Point(); }
+  public Vector getGravityPoints() { return null; }
+  public Fig getGroup() { return _group; }
+    public String getContext() { return _context; }
   public int getHalfHeight() { return _h / 2; }  
   public int getHalfWidth() { return _w / 2; }  
-  public int getHeight() { return _h; }  
+  public int getHeight() { return _h; }
   public String getId() {
 	if (getGroup() != null) {
 	  String gID = getGroup().getId();
@@ -460,7 +571,7 @@ implements Cloneable, java.io.Serializable, PropertyChangeListener, PopupGenerat
   public Point getLastPoint() { return new Point();}  
   public Layer getLayer() { return _layer; }  
   public Color getLineColor() { return _lineColor; }  
-  public int getLineWidth() { return _lineWidth; }  
+  public int getLineWidth() { return _lineWidth; }
   /** Returns a point that is the upper left corner of the Fig's
    *  bounding box. */
   public Point getLocation() { return new Point(_x, _y); }  
@@ -501,6 +612,7 @@ public String getPrivateData() {
   }  
   public Rectangle getTrapRect() { return getBounds(); }  
   public boolean getUseTrapRect() { return false; }  
+  public int getVisState() { return _shown; }
   public int getWidth() { return _w; }  
   public int getX() { return _x; }  
   public int[] getXs() { return new int[0]; }  
@@ -515,7 +627,7 @@ public String getPrivateData() {
 	int cornersHit = countCornersContained(r.x, r.y, r.width, r.height);
 	if (_filled) return cornersHit > 0;
 	else return cornersHit > 0 && cornersHit < 4;
-  }  
+  }
   public void insertPoint(int i, int x, int y) { }  
   /** Reply true if the object intersects the given rectangle. Used
    *  for selective redrawing and by ModeSelect to select all Figs
@@ -552,10 +664,12 @@ public String getPrivateData() {
   /** Method to paint this Fig.  By default it paints an "empty"
    *  space, subclasses should override this method. */
   public void paint(Graphics g) {
+      if ( _displayed ) {
 	g.setColor(Color.pink);
 	g.fillRect(_x, _y, _w, _h);
 	g.setColor(Color.black);
 	g.drawString("(undefined)", _x + _w/2, _y + _h/2);
+      }
   }  
   /** Return a point at the given distance along the path around this
    *  Fig. By default, uses perimeter of the Fig's bounding
@@ -566,7 +680,7 @@ public String getPrivateData() {
 	return res;
   }  
   public void postLoad() { }  
-  public void postSave() { }  
+  public void postSave() { }
   public void preSave() { }  
 //   public void assignShadowColor(Color c) { _shadowColor = c; } //?
 //   public void setShadowColor(Color c) { _shadowColor = c; }
@@ -585,7 +699,7 @@ public String getPrivateData() {
    *  FigNode may want to override this method. */
   public void propertyChange(PropertyChangeEvent pce) {
 	if (_group != null) _group.propertyChange(pce);
-  }  
+  }
   public void removePoint(int i) { }  
   /** Remove this PropertyChangeListener from the JellyBeans internal
    *  list.  If the PropertyChangeListener isn't on the list, silently
@@ -616,6 +730,13 @@ public String getPrivateData() {
   public final void setBounds(Rectangle r) {
 	setBounds(r.x, r.y, r.width, r.height);
   }  
+
+    public final void setCenter(Point p) {
+	int newX = p.x - (_w / 2);
+	int newY = p.y - (_h / 2);
+	setLocation(newX,newY);
+    }
+
   /** Set line to be dashed or not **/
   public void setDashed(boolean now_dashed) {
 	if (now_dashed) _dashes = DASH_ARRAYS[1];
@@ -660,10 +781,11 @@ public String getPrivateData() {
   public void setFilled(boolean f) {
 	firePropChange("filled", _filled, f);
 	_filled = f;
-  }  
+  }
   /** Sets the enclosing FigGroup of this Fig.  The enclosing group is
    * always notified of property changes, without need to add a listener. */
-  public void setGroup(Fig f) { _group = f; }  
+  public void setGroup(Fig f) { _group = f; }
+  public void setContext(String context) { _context = context; }
   public void setHeight(int h) { setBounds(_x, _y, _w, h); }  
   ////////////////////////////////////////////////////////////////
   // accessors
@@ -674,7 +796,7 @@ public String getPrivateData() {
   public void setLayer(Layer lay) {
 	firePropChange("layer", _layer, lay);
 	_layer = lay;
-  }  
+  }
   /** Internal function to change the line color attribute. Other code
    *  should use put(String key, Object value). */
   //public void assignLineColor(Color col) { _lineColor = col; } //?
@@ -743,10 +865,11 @@ public void setPrivateData(String data)
   }  
   /** Sets the size of the Fig. Fires property "bounds". */
   public final void setSize(Dimension d) { setSize(d.width, d.height); }  
+  public void setVisState(int visState) { _shown = visState; }
   public void setWidth(int w) { setBounds(_x, _y, w, _h); }  
   // needs-more-work: property change events?
   public void setX(int x) { setBounds(x, _y, _w, _h); }  
-  public void setXs(int[] xs) { }  
+  public void setXs(int[] xs) { }
   public void setY(int y) { setBounds(_x, y, _w, _h); }  
   public void setYs(int[] ys) { }  
   /** This indicates that some Cmd is starting a manipulation on the
@@ -757,7 +880,15 @@ public void setPrivateData(String data)
    *  the RedrawManager is key to avoiding "screen dirt". Each call to
    *  startTrans() MUST be matched with a call to endTrans(). */
   public void startTrans() {
-	damage();
+  	/*
+  	if (this.isAnnotation()){
+                if (!(Globals.curEditor().getSelectionManager().containsFig(this.getAnnotationOwner())) && Globals.curEditor().getSelectionManager().containsFig(this) ){
+                        (getAnnotationOwner().an).storeAnnotationPosition(this);
+                }
+        }
+        */
+        
+
 	//RedrawManager.lock(); // helps avoid dirt
   }  
   /** Reshape the given rectangle to be my bounding box. */
@@ -793,11 +924,23 @@ public void setPrivateData(String data)
 	Rectangle oldBounds = getBounds();
 	_x += dx; _y += dy;
 	firePropChange("bounds", oldBounds, getBounds());
-  }  
+  }
+
+    public void updateVisState() {}
+
   /** Reply true if the entire Fig is contained within the given
    *  Rectangle. This can be used by ModeSelect to select Figs that
    *  are totally within the selection rectangle. */
   public boolean within(Rectangle r) {
 	return r.contains(_x, _y) && r.contains(_x + _w, _y + _h);
   }  
+
+
+   /** Returns true if it is to be displayed. */
+   public boolean isDisplayed() { return _displayed; }
+
+   /** Determine if it is to be displayed. */
+   public void setDisplayed(boolean isDisplayed) { _displayed = isDisplayed; }
+
+
 } /* end class Fig */
